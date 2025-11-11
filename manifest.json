@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Meme Photo - Google Photos Uploader",
+  "version": "0.0.1",
+  "description": "Upload images to Google Photos from context menu",
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "Meme Photo"
+  },
+  "permissions": [
+    "storage",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "http://localhost/*"
+  ],
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  }
+}
