@@ -1,73 +1,92 @@
-# React + TypeScript + Vite
+# Meme Photo - Google Photos Uploader
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Chrome Extension for uploading images to Google Photos from context menu.
 
-Currently, two official plugins are available:
+## 🎯 Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Upload images to Google Photos with right-click context menu
+- OAuth 2.0 integration with Google account
+- Support for albums selection
+- Upload progress tracking
+- Chrome Manifest V3 compliant
 
-## React Compiler
+## 📦 Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **React 19.2.0** - UI framework
+- **TypeScript 5.9.3** - Type safety
+- **Vite 7.2.2** - Build tool
+- **CRXJS Vite Plugin 2.2.1** - Chrome Extension development with HMR
+- **Chrome API Types** - Full type support for Chrome Extension APIs
 
-## Expanding the ESLint configuration
+## 🚀 Development
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Node.js 18+ 
+- npm or pnpm
+- Google Chrome browser
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Setup
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Load Extension to Chrome
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+1. Open `chrome://extensions/`
+2. Enable "Developer mode"
+3. Click "Load unpacked"
+4. Select the **`dist/` folder** (not project root!)
+5. Extension ID: `YOUR_EXTENSION_ID_HERE`
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Development Workflow
+
+- The dev server supports HMR (Hot Module Replacement)
+- Changes to source files will automatically reload the extension
+- Check Service Worker console for background script logs
+
+## 🏗️ Build
+
+```bash
+# Build for production
+npm run build
 ```
+
+The production build will be in the `dist/` folder.
+
+## 📁 Project Structure
+
+```
+src/
+├── background/      # Service Worker (background scripts)
+├── content/         # Content Scripts (page injection)
+├── popup/           # Popup UI (extension popup)
+├── options/         # Options Page (settings)
+└── utils/           # Shared utilities
+public/
+└── icons/           # Extension icons
+```
+
+## 🔑 OAuth Setup
+
+See [TODO.md](./docs/2025-11-11/TODO.md) for detailed OAuth configuration steps.
+
+## 📝 Documentation
+
+- [Specification](./spec.md)
+- [TODO List](./docs/2025-11-11/TODO.md)
+- [Requirement Analysis](./docs/2025-11-10/requirement-analysis.md)
+- [Tech Stack Versions](./docs/2025-11-11/tech-stack-versions.md)
+
+## 🤝 Contributing
+
+This is a personal project. Issues and PRs are welcome.
+
+## 📄 License
+
+MIT
