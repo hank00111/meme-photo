@@ -70,78 +70,19 @@ async function testAuth() {
       console.warn('AUTH_WARNING: No granted scopes information available');
     }
     
-    // Step 4: Test calling Google Photos API with the token
-    await testGooglePhotosAPI(token);
+    // Authentication successful - ready to use API
+    console.log('AUTH_SUCCESS: OAuth authentication completed successfully');
+    console.log('AUTH_SUCCESS: Token is ready for Google Photos API calls');
+    console.log('');
+    console.log('IMPORTANT: Google Photos API Usage Notes:');
+    console.log('  - Using photoslibrary.appendonly scope');
+    console.log('  - Can upload images via POST to /v1/uploads endpoint');
+    console.log('  - Can create media items via /v1/mediaItems:batchCreate');
+    console.log('  - Can create and manage app-created albums');
+    console.log('  - Cannot list user albums (use Picker API for album selection)');
     
   } catch (error) {
     console.error('AUTH_ERROR: Authentication process error:', error);
-  }
-}
-
-// Test Google Photos API connection
-async function testGooglePhotosAPI(token: string) {
-  try {
-    console.log('API_CALL: Testing Google Photos API with appendonly scope...');
-    console.log('API_CALL: Note - albums.list is no longer supported with appendonly scope');
-    console.log('API_CALL: Testing upload endpoint instead...');
-    
-    // Test the upload endpoint (which works with appendonly scope)
-    const uploadEndpoint = 'https://photoslibrary.googleapis.com/v1/uploads';
-    console.log('API_CALL: Endpoint:', uploadEndpoint);
-    
-    // Just test if the endpoint is accessible (we're not uploading yet)
-    const response = await fetch(uploadEndpoint, {
-      method: 'OPTIONS',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    console.log('API_CALL: Response status:', response.status, response.statusText);
-    
-    if (response.status === 405 || response.status === 200) {
-      // 405 Method Not Allowed is expected for OPTIONS on upload endpoint
-      // This actually means the endpoint is accessible
-      console.log('API_SUCCESS: Successfully authenticated with Google Photos API');
-      console.log('API_SUCCESS: Upload endpoint is accessible');
-      console.log('API_SUCCESS: Ready to upload images to Google Photos');
-      console.log('');
-      console.log('IMPORTANT: Due to Google Photos API changes (March 2025):');
-      console.log('  - photoslibrary scope has been removed');
-      console.log('  - Now using photoslibrary.appendonly scope');
-      console.log('  - Can upload images and create albums');
-      console.log('  - Cannot list all user albums (only app-created albums)');
-      console.log('  - For album selection, consider using Google Photos Picker API');
-      return;
-    }
-    
-    if (!response.ok) {
-      console.error('API_ERROR: API call failed:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('API_ERROR: Error details:', errorText);
-      
-      // Parse error for better diagnostics
-      try {
-        const errorData = JSON.parse(errorText);
-        if (errorData.error?.status === 'PERMISSION_DENIED') {
-          console.error('API_ERROR: PERMISSION_DENIED - Token does not have required scopes');
-          console.error('API_ERROR: Required scope: https://www.googleapis.com/auth/photoslibrary.appendonly');
-          console.error('API_ERROR: Solution:');
-          console.error('  1. Go to Google Cloud Console > APIs & Services > OAuth consent screen');
-          console.error('  2. Remove old scope: https://www.googleapis.com/auth/photoslibrary');
-          console.error('  3. Add new scope: https://www.googleapis.com/auth/photoslibrary.appendonly');
-          console.error('  4. Revoke app permissions: https://myaccount.google.com/permissions');
-          console.error('  5. Reload extension and test again');
-        }
-      } catch (e) {
-        // Error is not JSON, already logged above
-      }
-      
-      return;
-    }
-    
-  } catch (error) {
-    console.error('API_ERROR: API test failed:', error);
   }
 }
 
