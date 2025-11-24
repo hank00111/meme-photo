@@ -70,7 +70,8 @@ async function handleImageUpload(imageUrl: string, pageUrl?: string, tab?: chrom
     // Step 4: Create media item
     const mediaItem = await createMediaItem(uploadToken, filename, token);
     
-    // Step 5: Log success (notifications will be added in Task 7)
+    // Step 5: Show success notification
+    showSuccessNotification(mediaItem, filename);
     console.log('UPLOAD_SUCCESS: Media item created -', mediaItem.id);
     console.log('UPLOAD_SUCCESS: Product URL -', mediaItem.productUrl);
     
@@ -80,10 +81,29 @@ async function handleImageUpload(imageUrl: string, pageUrl?: string, tab?: chrom
   }
 }
 
-// Placeholder - will implement in Task 7
-function showErrorNotification(message: string) {
-  console.error('ERROR_NOTIFICATION:', message);
-  // TODO: Use chrome.notifications API in Task 7
+// Show success notification
+function showSuccessNotification(mediaItem: any, filename: string) {
+  chrome.notifications.create({
+    type: 'basic',
+    iconUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    title: 'Upload Successful',
+    message: `${filename} uploaded to Google Photos`,
+    buttons: [
+      { title: 'View in Google Photos' }
+    ],
+    priority: 1
+  });
+}
+
+// Show error notification
+function showErrorNotification(errorMessage: string) {
+  chrome.notifications.create({
+    type: 'basic',
+    iconUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    title: 'Upload Failed',
+    message: errorMessage,
+    priority: 2
+  });
 }
 
 // Download image from URL
@@ -334,5 +354,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       sendResponse({ success: false, error: error.message });
     });
     return true; // Keep message channel open
+  }
+});
+
+// Handle notification button clicks
+chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
+  if (buttonIndex === 0) {
+    chrome.tabs.create({ url: 'https://photos.google.com' });
   }
 });
