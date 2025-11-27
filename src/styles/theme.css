@@ -1,0 +1,167 @@
+/**
+ * Yard Dental Theme - Design System
+ * 
+ * This file defines the complete color palette and design tokens
+ * extracted from https://yard-dental.com/ using Playwright MCP.
+ * All colors verified via browser DOM computed styles for 100% accuracy.
+ * 
+ * Last verified: 2025-11-26
+ * Analysis document: docs/20251125/popup-redesign-analysis.md
+ */
+
+:root {
+  /* ===== COLORS - YARD DENTAL THEME ===== */
+  
+  /* Background Colors */
+  --color-bg-primary: #fffdf6;      /* Main background - Warm off-white */
+  --color-bg-secondary: #fcf7e1;    /* Secondary background - Light cream */
+  --color-bg-tertiary: #f4f0db;     /* Tertiary background - Beige tone */
+  --color-bg-footer: #eee8d1;       /* Footer background - Light taupe */
+  
+  /* Brand Green Colors */
+  --color-brand-green: #469238;       /* Primary brand green - Main buttons/accents */
+  --color-brand-green-light: #5a9f4d; /* Light green - Hover states */
+  --color-brand-green-dark: #3a833d;  /* Dark green - Active states */
+  
+  /* Text Colors */
+  --color-text-primary: #282d27;    /* Primary text - Dark gray-green */
+  --color-text-secondary: #808080;  /* Secondary text - Gray (timestamps, etc.) */
+  
+  /* Additional Background Variations (for future use) */
+  --color-bg-variant-1: #eee8d1;    /* Alternative block background */
+  --color-bg-variant-2: #ece4cc;    /* Warm beige */
+  --color-bg-variant-3: #e9e1ce;    /* Shadow/semi-transparent */
+  
+  /* ===== SPACING SYSTEM ===== */
+  
+  --spacing-xs: 4px;    /* Extra small spacing */
+  --spacing-sm: 8px;    /* Small spacing */
+  --spacing-md: 16px;   /* Medium spacing (default) */
+  --spacing-lg: 24px;   /* Large spacing */
+  --spacing-xl: 32px;   /* Extra large spacing */
+  
+  /* ===== BORDER RADIUS ===== */
+  
+  --radius-sm: 4px;     /* Small radius - Subtle rounded corners */
+  --radius-md: 8px;     /* Medium radius - Standard rounded corners */
+  --radius-lg: 12px;    /* Large radius - Prominent rounded corners */
+  --radius-full: 50%;   /* Full radius - Circular elements (avatars, etc.) */
+  
+  /* ===== SHADOWS ===== */
+  
+  --shadow-sm: 0 1px 3px rgba(40, 45, 39, 0.1);   /* Small shadow - Subtle elevation */
+  --shadow-md: 0 4px 6px rgba(40, 45, 39, 0.1);   /* Medium shadow - Card elevation */
+  
+  /* ===== TYPOGRAPHY ===== */
+  
+  /* Font Families (can be customized based on design needs) */
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 
+                      'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 
+                      'Helvetica Neue', sans-serif;
+  --font-family-mono: 'Courier New', Courier, monospace;
+  
+  /* Font Sizes */
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  
+  /* Line Heights */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+  
+  /* ===== TRANSITIONS ===== */
+  
+  --transition-fast: 150ms ease-in-out;
+  --transition-normal: 250ms ease-in-out;
+  --transition-slow: 350ms ease-in-out;
+  
+  /* ===== Z-INDEX LAYERS ===== */
+  
+  --z-index-base: 0;
+  --z-index-dropdown: 100;
+  --z-index-sticky: 200;
+  --z-index-overlay: 300;
+  --z-index-modal: 400;
+  --z-index-tooltip: 500;
+}
+
+/* ===== GLOBAL RESETS & UTILITIES ===== */
+
+/* Smooth scrolling for better UX */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Apply base font family to body */
+body {
+  font-family: var(--font-family-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  line-height: var(--line-height-normal);
+}
+
+/* Reset box-sizing for consistent layout calculations */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ===== UTILITY CLASSES ===== */
+
+/* Text colors */
+.text-primary {
+  color: var(--color-text-primary);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+/* Background colors */
+.bg-primary {
+  background-color: var(--color-bg-primary);
+}
+
+.bg-secondary {
+  background-color: var(--color-bg-secondary);
+}
+
+/* Brand colors */
+.brand-green {
+  color: var(--color-brand-green);
+}
+
+.bg-brand-green {
+  background-color: var(--color-brand-green);
+}
+
+/* Shadows */
+.shadow-sm {
+  box-shadow: var(--shadow-sm);
+}
+
+.shadow-md {
+  box-shadow: var(--shadow-md);
+}
+
+/* Border radius */
+.rounded-sm {
+  border-radius: var(--radius-sm);
+}
+
+.rounded-md {
+  border-radius: var(--radius-md);
+}
+
+.rounded-lg {
+  border-radius: var(--radius-lg);
+}
+
+.rounded-full {
+  border-radius: var(--radius-full);
+}

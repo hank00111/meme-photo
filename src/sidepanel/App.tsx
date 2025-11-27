@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
-import './App.css'
+import '../styles/components.css'
 
 function App() {
-  const [status, setStatus] = useState<string>('Ready')
+  const [status, setStatus] = useState<string>('Not tested yet')
   const [loading, setLoading] = useState(false)
-  const [version, setVersion] = useState<string>('')
+  const [isDevelopment, setIsDevelopment] = useState(false)
+  const [version, setVersion] = useState('')
 
   useEffect(() => {
     const manifest = chrome.runtime.getManifest()
+    setIsDevelopment(!manifest.key)
     setVersion(manifest.version)
   }, [])
 
@@ -31,85 +33,41 @@ function App() {
   }
 
   return (
-    <div style={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      boxSizing: 'border-box',
-      overflow: 'hidden'
-    }}>
-      <div style={{ 
-        flex: 1, 
-        overflowY: 'auto', 
-        padding: '20px',
-        boxSizing: 'border-box'
-      }}>
-        <h1>Meme Photo Side Panel</h1>
-        <p>Google Photos Upload Tool - Full Interface</p>
-        
-        <div style={{ marginTop: '20px' }}>
-          <h2>Authentication</h2>
-          <button 
-            onClick={testAuth}
-            disabled={loading}
-            style={{
-              padding: '12px 24px',
-              fontSize: '16px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              backgroundColor: '#4285f4',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              width: '100%'
-            }}
-          >
-            {loading ? 'Testing...' : 'Test OAuth Authentication'}
-          </button>
+    <div className="app-container">
+      {/* Header */}
+      <header className="app-header">
+        <div className="header-content">
+          <div className="avatar-placeholder"></div>
+          <h1 className="app-title">Meme Photo</h1>
         </div>
-        
-        <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f0f0f0', borderRadius: '4px' }}>
-          <strong>Status:</strong> {status}
-        </div>
-        
-        <div style={{ marginTop: '20px' }}>
-          <h2>Features</h2>
-          <div style={{ fontSize: '14px', color: '#666' }}>
-            <p>Side Panel advantages:</p>
-            <ul style={{ textAlign: 'left', paddingLeft: '20px' }}>
-              <li>Stays open while browsing</li>
-              <li>More space for album lists and upload progress</li>
-              <li>Better for development with HMR</li>
-              <li>Independent from page interactions</li>
-            </ul>
+        {isDevelopment && (
+          <div className="dev-section">
+            <button 
+              className="btn-test-auth"
+              onClick={testAuth}
+              disabled={loading}
+            >
+              {loading ? 'Testing...' : 'Test OAuth Authentication'}
+            </button>
+            <div className="test-status">
+              <strong>Status:</strong> {status}
+            </div>
           </div>
-          
-          <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#e8f5e9', borderRadius: '4px' }}>
-            <h3 style={{ marginTop: 0 }}>Coming Soon</h3>
-            <ul style={{ textAlign: 'left', paddingLeft: '20px', fontSize: '14px' }}>
-              <li>Album list and selection</li>
-              <li>Image upload with progress tracking</li>
-              <li>Batch upload support</li>
-              <li>Upload history</li>
-            </ul>
-          </div>
+        )}
+      </header>
+
+      {/* Content */}
+      <main className="app-content">
+        <div className="upload-history">
+          <p className="empty-state">Upload history will appear here</p>
         </div>
-      </div>
-      
-      <div style={{ 
-        padding: '12px 20px', 
-        borderTop: '1px solid #ddd', 
-        backgroundColor: '#f9f9f9',
-        fontSize: '12px', 
-        color: '#666',
-        flexShrink: 0
-      }}>
-        <div style={{ marginBottom: '4px' }}>
-          Check Service Worker Console for detailed logs
-        </div>
-        <div style={{ color: '#999', fontSize: '11px' }}>
-          Version {version}
-        </div>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="app-footer">
+        <span className="version">Version {version}</span>
+        <button className="btn-donate">Donate ❤️</button>
+      </footer>
     </div>
   )
 }
