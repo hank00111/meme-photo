@@ -35,7 +35,8 @@ export interface UploadRecord {
 /**
  * User Profile Interface
  * 
- * Stores user's Google account information retrieved from People API.
+ * Stores user's Google account information retrieved from Google UserInfo endpoint.
+ * Uses OpenID Connect standard userinfo.profile scope.
  * photoUrl is cached locally to avoid repeated API calls.
  */
 export interface UserProfile {

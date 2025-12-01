@@ -1,3 +1,5 @@
+import { addUploadRecord } from '../utils/uploadHistory';
+
 console.log('INFO: Meme Photo extension loaded');
 
 chrome.runtime.onInstalled.addListener((details) => {
@@ -69,6 +71,18 @@ async function handleImageUpload(imageUrl: string, pageUrl?: string, tab?: chrom
     
     // Step 4: Create media item
     const mediaItem = await createMediaItem(uploadToken, filename, token);
+    
+    // Step 4.5: Save upload record
+    try {
+      await addUploadRecord({
+        filename: filename,
+        mediaItemId: mediaItem.id,
+        productUrl: mediaItem.productUrl
+      });
+      console.log('HISTORY: Upload record saved successfully');
+    } catch (error) {
+      console.error('HISTORY_ERROR: Failed to save upload record:', error);
+    }
     
     // Step 5: Show success notification
     showSuccessNotification(mediaItem, filename);
