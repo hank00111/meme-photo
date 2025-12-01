@@ -17,7 +17,7 @@
 
 /* Header Section */
 .app-header {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-secondary);
   padding: var(--spacing-md);
   border-bottom: 1px solid var(--color-bg-footer);
 }
@@ -129,7 +129,7 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--spacing-sm) var(--spacing-md);
-  background-color: var(--color-bg-footer);
+  background-color: var(--color-bg-secondary);
   border-top: 1px solid var(--color-bg-tertiary);
   font-size: 12px;
 }
