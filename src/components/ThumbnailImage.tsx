@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getThumbnailUrl } from '../utils/thumbnailCache';
+import { showError } from '../utils/toast';
 
 /**
  * ThumbnailImage Component
@@ -9,7 +10,7 @@ import { getThumbnailUrl } from '../utils/thumbnailCache';
  * 
  * Features:
  * - Skeleton loading state with shimmer animation
- * - 200x200px thumbnail display
+ * - 48x48px thumbnail display
  * - Error fallback with icon + filename
  * - Automatic OAuth token management
  * - Dynamic baseUrl fetching via getThumbnailUrl()
@@ -51,6 +52,7 @@ export default function ThumbnailImage({
 
         if (chrome.runtime.lastError || !result?.token) {
           console.error('THUMBNAIL: Failed to get auth token:', chrome.runtime.lastError);
+          showError('THUMBNAIL_LOAD_FAILED');
           setHasError(true);
           setIsLoading(false);
           return;
@@ -66,6 +68,7 @@ export default function ThumbnailImage({
           setIsLoading(false);
         } else {
           console.error('THUMBNAIL: getThumbnailUrl returned null for mediaItemId:', mediaItemId);
+          showError('THUMBNAIL_LOAD_FAILED');
           setHasError(true);
           setIsLoading(false);
         }
@@ -74,6 +77,7 @@ export default function ThumbnailImage({
         if (!isMounted) return;
         
         console.error('THUMBNAIL: Unexpected error fetching thumbnail:', error);
+        showError('THUMBNAIL_LOAD_FAILED');
         setHasError(true);
         setIsLoading(false);
       }
@@ -97,6 +101,7 @@ export default function ThumbnailImage({
    */
   const handleImageError = () => {
     console.error('THUMBNAIL: Image failed to load for mediaItemId:', mediaItemId);
+    showError('THUMBNAIL_LOAD_FAILED');
     setHasError(true);
   };
 
@@ -121,6 +126,8 @@ export default function ThumbnailImage({
       src={thumbnailUrl} 
       alt={filename}
       className="thumbnail-image"
+      width={48}
+      height={48}
       onError={handleImageError}
     />
   );

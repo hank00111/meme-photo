@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { showError } from '../utils/toast';
 import type { UserProfile } from '../types/storage';
 
 /**
@@ -39,6 +40,8 @@ export default function UserAvatar({
    * Parent should call getUserProfile(token, true) to force refresh
    */
   const handleImageError = () => {
+    console.error('AVATAR: Photo URL failed to load');
+    showError('PROFILE_LOAD_FAILED');
     setImageError(true);
     onRefresh?.();
   };

@@ -231,8 +231,8 @@
 
 /* Skeleton loading state with shimmer animation */
 .thumbnail-skeleton {
-  width: 200px;
-  height: 200px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--radius-md);
   background: linear-gradient(
     90deg,
@@ -257,18 +257,19 @@
 
 /* Thumbnail image display */
 .thumbnail-image {
-  width: 200px;
-  height: 200px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--radius-md);
   object-fit: cover;
   flex-shrink: 0;
   background-color: var(--color-bg-tertiary);
+  display: block; /* Eliminate inline baseline gap */
 }
 
 /* Error fallback container */
 .thumbnail-error {
-  width: 200px;
-  height: 200px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--radius-md);
   background-color: var(--color-bg-tertiary);
   display: flex;
@@ -276,26 +277,256 @@
   align-items: center;
   justify-content: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-md);
   flex-shrink: 0;
 }
 
 /* Error icon (emoji) */
 .thumbnail-error-icon {
-  font-size: 48px;
+  font-size: 20px;
   line-height: 1;
   opacity: 0.5;
 }
 
-/* Error text (filename) */
+/* Error text (filename) - hidden for small thumbnail */
 .thumbnail-error-text {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  text-align: center;
-  word-break: break-word;
-  max-width: 100%;
+  display: none;
+}
+
+/* ===== UPLOAD RECORD CARD COMPONENT ===== */
+
+/* Card container with Display-Only mode (non-interactive except delete button) */
+.upload-record-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+  transition: background-color 0.2s ease;
+}
+
+/* Thumbnail container (left section) */
+.record-thumbnail {
+  flex-shrink: 0;
+}
+
+/* Info container (middle section) */
+.record-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+/* Filename display */
+.record-filename {
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  font-weight: 500;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Timestamp display (relative time) */
+.record-timestamp {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Delete button (only interactive element in Display-Only card) */
+.delete-button {
+  pointer-events: auto;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: 24px;
+  font-weight: 300;
+  line-height: 1;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.delete-button:hover {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.delete-button:active {
+  background-color: var(--color-bg-footer);
+}
+
+/* ===== UPLOAD HISTORY COMPONENT ===== */
+
+/* Upload history container (vertical list) */
+.upload-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* Loading state */
+.loading-state {
+  text-align: center;
+  color: var(--color-text-secondary);
+  padding: var(--spacing-xl);
+  font-size: var(--font-size-base);
+}
+
+/* ===== ERROR BOUNDARY COMPONENT ===== */
+
+/* Error boundary container (full-screen overlay) */
+.error-boundary {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  z-index: 9999;
+}
+
+/* Error content box */
+.error-content {
+  background-color: var(--color-bg-secondary);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  max-width: 500px;
+  text-align: center;
+}
+
+.error-content h2 {
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-md) 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.error-content p {
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-md) 0;
+  line-height: 1.5;
+}
+
+.error-content details {
+  margin: var(--spacing-md) 0;
+  text-align: left;
+}
+
+.error-content summary {
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.error-content pre {
+  background-color: var(--color-bg-tertiary);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  text-align: left;
+}
+
+/* Retry button */
+.retry-button {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background-color: var(--color-brand-green);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.retry-button:hover {
+  background-color: var(--color-brand-green-light);
+}
+
+.retry-button:active {
+  background-color: var(--color-brand-green-dark);
+}
+
+/* ===== TOAST NOTIFICATION SYSTEM ===== */
+
+/* Toast container (fixed position, top-right) */
+#toast-container {
+  position: fixed;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  pointer-events: none;
+}
+
+/* Base toast styles */
+.toast {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 250px;
+  max-width: 350px;
+  font-size: 14px;
+  line-height: 1.4;
+  pointer-events: auto;
+  transform: translateX(400px);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Toast visible state (slide in) */
+.toast-visible {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* Toast hiding state (slide out) */
+.toast-hiding {
+  transform: translateX(400px);
+  opacity: 0;
+}
+
+/* Success toast */
+.toast-success {
+  background-color: var(--color-brand-green);
+  color: white;
+}
+
+/* Error toast */
+.toast-error {
+  background-color: #dc3545;
+  color: white;
+}
+
+/* Info toast */
+.toast-info {
+  background-color: #0dcaf0;
+  color: white;
+}
+
+/* Warning toast */
+.toast-warning {
+  background-color: #ffc107;
+  color: #000;
 }

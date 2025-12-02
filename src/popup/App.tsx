@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import '../styles/components.css'
+import ErrorBoundary from '../components/ErrorBoundary'
 import AuthOverlay from '../components/AuthOverlay'
 import UserAvatar from '../components/UserAvatar'
-import { getUserProfile } from '../utils/userProfile'
+import UploadHistory from '../components/UploadHistory'
+import { getUserProfile, clearUserProfile } from '../utils/userProfile'
+import { showError } from '../utils/toast'
 import type { UserProfile } from '../types/storage'
 
 function App() {
-  const [status, setStatus] = useState<string>('Not tested yet')
-  const [loading, setLoading] = useState(false)
   const [isDevelopment, setIsDevelopment] = useState(false)
   const [version, setVersion] = useState('')
   const [isAuthorized, setIsAuthorized] = useState(false)
@@ -79,6 +80,7 @@ function App() {
       }
     } catch (error) {
       console.error('Authorization failed:', error)
+      showError('AUTH_FAILED')
     } finally {
       setIsAuthLoading(false)
     }
@@ -95,6 +97,7 @@ function App() {
       }
       await chrome.identity.clearAllCachedAuthTokens()
       console.log('AUTH: All cached tokens cleared')
+      await clearUserProfile()
       await chrome.storage.local.set({ isManuallyLoggedOut: true })
       setUserProfile(null)
       setIsAuthorized(false)
@@ -112,25 +115,6 @@ function App() {
     }
   }
 
-  const testAuth = async () => {
-    setLoading(true)
-    setStatus('Running authentication test...')
-    
-    try {
-      const response = await chrome.runtime.sendMessage({ action: 'testAuth' })
-      
-      if (response.success) {
-        setStatus('Authentication test successful! Check Service Worker Console')
-      } else {
-        setStatus('Authentication test failed: ' + response.error)
-      }
-    } catch (error) {
-      setStatus('Error occurred: ' + (error as Error).message);
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const openSidePanel = async () => {
     try {
       const windowId = (await chrome.windows.getCurrent()).id
@@ -143,16 +127,17 @@ function App() {
   }
 
   return (
-    <div className="app-container">
-      {!isAuthorized ? (
-        <AuthOverlay 
-          onAuthorize={handleAuthorize} 
-          isLoading={isAuthLoading} 
-        />
-      ) : (
-        <>
-          {/* Header */}
-          <header className="app-header">
+    <ErrorBoundary>
+      <div className="app-container">
+        {!isAuthorized ? (
+          <AuthOverlay 
+            onAuthorize={handleAuthorize} 
+            isLoading={isAuthLoading} 
+          />
+        ) : (
+          <>
+            {/* Header */}
+            <header className="app-header">
             <div className="header-content">
               <UserAvatar 
                 userProfile={userProfile}
@@ -168,30 +153,18 @@ function App() {
               <div className="dev-section">
                 <button 
                   className="btn-test-auth"
-                  onClick={testAuth}
-                  disabled={loading}
-                >
-                  {loading ? 'Testing...' : 'Test OAuth Authentication'}
-                </button>
-                <button 
-                  className="btn-test-auth"
                   onClick={handleLogout}
-                  style={{ marginTop: '8px', backgroundColor: '#ff9800' }}
+                  style={{ backgroundColor: '#ff9800' }}
                 >
                   Logout
                 </button>
-                <div className="test-status">
-                  <strong>Status:</strong> {status}
-                </div>
               </div>
             )}
           </header>
 
           {/* Content */}
           <main className="app-content">
-            <div className="upload-history">
-              <p className="empty-state">Upload history will appear here</p>
-            </div>
+            <UploadHistory />
           </main>
 
           {/* Footer */}
@@ -201,7 +174,8 @@ function App() {
           </footer>
         </>
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   )
 }
 

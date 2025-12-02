@@ -85,7 +85,7 @@ export async function getThumbnailUrl(
       return null;
     }
 
-    const thumbnailUrl = `${mediaItem.baseUrl}=w200-h200`;
+    const thumbnailUrl = `${mediaItem.baseUrl}=s48`;
     console.log('THUMBNAIL: Successfully fetched thumbnail URL');
 
     return thumbnailUrl;
