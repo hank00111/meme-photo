@@ -7,13 +7,17 @@
  * Features:
  * - Maximum visible toasts limit (prevents stacking overflow)
  * - Duplicate message prevention (same message won't show twice)
+ * - Cleanup function to remove all toasts and pending timers
  * 
  * @example
  * ```typescript
- * import { showToast, ERROR_MESSAGES } from '../utils/toast';
+ * import { showToast, ERROR_MESSAGES, cleanupToasts } from '../utils/toast';
  * 
  * showToast(ERROR_MESSAGES.NETWORK_ERROR, 'error');
  * showToast('Upload successful!', 'success');
+ * 
+ * // Cleanup when component unmounts
+ * cleanupToasts();
  * ```
  */
 
@@ -22,6 +26,11 @@
  * Based on Sonner library best practice (default: 3)
  */
 const MAX_VISIBLE_TOASTS = 3;
+
+/**
+ * Track active toast timers for cleanup
+ */
+const activeTimers: Set<ReturnType<typeof setTimeout>> = new Set();
 
 /**
  * Toast notification types
@@ -43,6 +52,27 @@ export const ERROR_MESSAGES = {
   FILE_TOO_LARGE: 'File size exceeds 200MB limit.',
   PROFILE_LOAD_FAILED: 'Failed to load user profile. Please try again.'
 } as const;
+
+/**
+ * Cleanup all toasts and pending timers
+ * 
+ * Call this when the component unmounts or on page unload to prevent:
+ * - Memory leaks from orphaned timers
+ * - State updates on unmounted components
+ */
+export function cleanupToasts(): void {
+  // Clear all pending timers
+  for (const timer of activeTimers) {
+    clearTimeout(timer);
+  }
+  activeTimers.clear();
+  
+  // Remove toast container and all toasts
+  const container = document.getElementById('toast-container');
+  if (container) {
+    container.remove();
+  }
+}
 
 /**
  * Show a toast notification
@@ -97,22 +127,34 @@ export function showToast(
   toast.classList.add('toast-visible');
 
   // Auto-dismiss
-  setTimeout(() => {
+  const dismissTimer = setTimeout(() => {
     toast.classList.remove('toast-visible');
     toast.classList.add('toast-hiding');
     
     // Remove from DOM after animation
-    setTimeout(() => {
+    const removeTimer = setTimeout(() => {
       if (toast.parentNode) {
         toast.parentNode.removeChild(toast);
       }
       
-      // Remove container if empty
-      if (container && container.children.length === 0) {
-        container.remove();
-      }
+      // Delay container removal to ensure all pending animations complete
+      // This prevents race conditions when toasts are added/removed rapidly
+      setTimeout(() => {
+        const currentContainer = document.getElementById('toast-container');
+        if (currentContainer && currentContainer.children.length === 0) {
+          currentContainer.remove();
+        }
+      }, 50);
+      
+      // Clean up timer reference
+      activeTimers.delete(removeTimer);
     }, 300); // Match CSS transition duration
+    
+    activeTimers.add(removeTimer);
+    activeTimers.delete(dismissTimer);
   }, duration);
+  
+  activeTimers.add(dismissTimer);
 }
 
 /**

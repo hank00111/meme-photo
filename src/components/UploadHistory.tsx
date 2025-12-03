@@ -76,6 +76,9 @@ export default function UploadHistory() {
   /**
    * Handle delete button click from UploadRecordCard
    * 
+   * Optimized: No need to call getUploadHistory() after delete.
+   * The storage.onChanged listener will automatically sync the UI.
+   * 
    * @param id - UUID of the record to delete
    */
   const handleDelete = async (id: string) => {
@@ -83,9 +86,8 @@ export default function UploadHistory() {
       const success = await deleteUploadRecord(id);
       
       if (success) {
-        // Refresh UI by fetching updated records
-        const updated = await getUploadHistory();
-        setRecords(updated);
+        // UI will be updated automatically via storage.onChanged listener
+        // No need for redundant getUploadHistory() call
         showSuccess('Record deleted successfully');
       } else {
         console.warn('HISTORY: Delete failed, record not found:', id);

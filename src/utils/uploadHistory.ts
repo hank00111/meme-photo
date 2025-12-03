@@ -1,59 +1,25 @@
 /**
  * Upload History Utility
- * 
- * Manages CRUD operations for upload records in chrome.storage.local.
- * Implements a 50-record limit to keep storage usage minimal.
- * 
- * Storage Architecture:
- * - Storage Layer: Maximum 50 records (enforced via .slice(0, 50))
- * - UI Layer: Displays 10 most recent records (handled by UI components)
- * - Space Usage: ~25 KB for 50 records (0.25% of 10 MB quota)
+ * Manages upload records in chrome.storage.local with 50-record limit.
  */
 
 import type { UploadRecord } from '../types/storage';
 
-/**
- * Maximum number of upload records to keep in storage.
- * Older records are automatically removed when this limit is exceeded.
- */
+/** Maximum records to keep. Older records are auto-removed. */
 const MAX_RECORDS = 50;
 
-/**
- * Get all upload history records from storage.
- * 
- * @returns Promise resolving to array of upload records (newest first)
- * @returns Empty array if no records exist or if an error occurs
- * 
- * @example
- * const history = await getUploadHistory();
- * const recentRecords = history.slice(0, 10); // Get 10 most recent
- */
+/** Get all upload records from storage (newest first). */
 export async function getUploadHistory(): Promise<UploadRecord[]> {
   try {
     const result = await chrome.storage.local.get('uploadHistory');
-    return result.uploadHistory ?? [];
+    return (result.uploadHistory ?? []) as UploadRecord[];
   } catch (error) {
     console.error('HISTORY: Failed to get upload history:', error);
     return [];
   }
 }
 
-/**
- * Add a new upload record to storage.
- * Automatically generates UUID and timestamp.
- * Enforces 50-record limit by removing oldest records.
- * 
- * @param record - Upload record data (without id and timestamp)
- * @returns Promise that resolves when record is saved
- * 
- * @example
- * await addUploadRecord({
- *   filename: 'meme.jpg',
- *   mediaItemId: 'AJ...',
- *   productUrl: 'https://photos.google.com/...',
- *   albumId: 'AP...' // optional
- * });
- */
+/** Add a new upload record. Auto-generates UUID and timestamp, enforces 50-record limit. */
 export async function addUploadRecord(
   record: Omit<UploadRecord, 'id' | 'timestamp'>
 ): Promise<void> {
@@ -66,7 +32,8 @@ export async function addUploadRecord(
     };
 
     // Get existing history
-    const { uploadHistory = [] } = await chrome.storage.local.get('uploadHistory');
+    const result = await chrome.storage.local.get('uploadHistory');
+    const uploadHistory = (result.uploadHistory ?? []) as UploadRecord[];
 
     // Add new record at the beginning and enforce 50-record limit
     const updated = [newRecord, ...uploadHistory].slice(0, MAX_RECORDS);
@@ -85,21 +52,11 @@ export async function addUploadRecord(
   }
 }
 
-/**
- * Delete an upload record from storage by ID.
- * 
- * @param id - UUID of the record to delete
- * @returns Promise resolving to true if deleted, false if not found
- * 
- * @example
- * const success = await deleteUploadRecord('f47ac10b-58cc-4372-a567-0e02b2c3d479');
- * if (success) {
- *   console.log('Record deleted');
- * }
- */
+/** Delete an upload record by ID. Returns true if deleted, false if not found. */
 export async function deleteUploadRecord(id: string): Promise<boolean> {
   try {
-    const { uploadHistory = [] } = await chrome.storage.local.get('uploadHistory');
+    const result = await chrome.storage.local.get('uploadHistory');
+    const uploadHistory = (result.uploadHistory ?? []) as UploadRecord[];
 
     // Filter out the record with matching ID
     const updated = uploadHistory.filter((r: UploadRecord) => r.id !== id);

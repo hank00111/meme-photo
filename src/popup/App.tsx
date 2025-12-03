@@ -172,8 +172,8 @@ function App() {
 
           {/* Footer */}
           <footer className="app-footer">
-            <span className="version">Version {version}</span>
-            <button className="btn-donate">Donate ❤️</button>
+            <span className="version">v{version}</span>
+            {/* <button className="btn-donate">Donate ❤️</button> */}
           </footer>
         </>
       )}

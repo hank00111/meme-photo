@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { showError } from '../utils/toast';
 import type { UserProfile } from '../types/storage';
 
@@ -49,11 +49,14 @@ export default function UserAvatar({
   /**
    * Reset error state when userProfile changes
    * 
-   * This allows retry when parent successfully refreshes the profile
+   * This allows retry when parent successfully refreshes the profile.
+   * Using useEffect to avoid calling setState during render phase.
    */
-  if (imageError && userProfile?.photoUrl) {
-    setImageError(false);
-  }
+  useEffect(() => {
+    if (imageError && userProfile?.photoUrl) {
+      setImageError(false);
+    }
+  }, [userProfile?.photoUrl, imageError]);
 
   // Show placeholder during loading or when profile unavailable
   if (isLoading || !userProfile || imageError) {

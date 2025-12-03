@@ -1,50 +1,32 @@
 /**
- * Thumbnail Cache Utility for Meme Photo Extension
+ * Thumbnail Cache Utility
  * 
- * Handles caching of thumbnail images locally to avoid repeated API calls.
- * Thumbnails are stored as Base64 Data URLs in chrome.storage.local.
+ * Caches thumbnails as Base64 Data URLs in chrome.storage.local.
+ * Google Photos baseUrl expires after 60 minutes, but cached image data is permanent.
  * 
- * WHY THIS IS NEEDED:
- * Google Photos baseUrl expires after 60 minutes. Instead of fetching from API
- * every time, we cache the actual image data locally. The image content is permanent,
- * only the URL expires.
- * 
- * STORAGE ARCHITECTURE:
- * - Location: chrome.storage.local.thumbnailCache
- * - Format: { [mediaItemId]: { base64DataUrl, cachedAt } }
- * - Size estimate: ~3-7 KB per thumbnail (48x48px)
- * - Max storage: ~350 KB for 50 thumbnails (well within 10 MB limit)
- * 
- * DEPENDENCIES:
- * - Requires OAuth scope: photoslibrary.readonly.appcreateddata
- * - Works with UploadRecord.mediaItemId stored by background script
- * 
- * USAGE EXAMPLE:
- * ```typescript
- * const token = await chrome.identity.getAuthToken({ interactive: false });
- * const thumbnailDataUrl = await getThumbnailDataUrl(record.mediaItemId, token.token);
- * if (thumbnailDataUrl) {
- *   imgElement.src = thumbnailDataUrl;
- * }
- * ```
+ * Features:
+ * - LRU eviction when cache exceeds MAX_CACHE_SIZE entries
+ * - Uses lastAccessedAt timestamp for LRU tracking
  */
 
 import type { ThumbnailCache, ThumbnailCacheEntry } from '../types/storage';
 
-/**
- * Retrieves cached thumbnail from chrome.storage.local
- * 
- * @param mediaItemId - Google Photos media item ID
- * @returns Cached Base64 Data URL or null if not cached
- */
+/** Maximum number of cached thumbnails. Oldest accessed entries are evicted first. */
+const MAX_CACHE_SIZE = 100;
+
 async function getCachedThumbnail(mediaItemId: string): Promise<string | null> {
   try {
     const result = await chrome.storage.local.get('thumbnailCache');
-    const cache: ThumbnailCache = result.thumbnailCache ?? {};
+    const cache = (result.thumbnailCache ?? {}) as ThumbnailCache;
     
     const entry = cache[mediaItemId];
     if (entry?.base64DataUrl) {
       console.log('THUMBNAIL_CACHE: Cache hit for mediaItemId:', mediaItemId);
+      
+      // Update lastAccessedAt for LRU tracking
+      entry.lastAccessedAt = Date.now();
+      await chrome.storage.local.set({ thumbnailCache: cache });
+      
       return entry.base64DataUrl;
     }
     
@@ -56,23 +38,40 @@ async function getCachedThumbnail(mediaItemId: string): Promise<string | null> {
   }
 }
 
-/**
- * Saves thumbnail to chrome.storage.local cache
- * 
- * @param mediaItemId - Google Photos media item ID
- * @param base64DataUrl - Base64 encoded image data URL
- */
 async function cacheThumbnail(
   mediaItemId: string,
   base64DataUrl: string
 ): Promise<void> {
   try {
     const result = await chrome.storage.local.get('thumbnailCache');
-    const cache: ThumbnailCache = result.thumbnailCache ?? {};
+    const cache = (result.thumbnailCache ?? {}) as ThumbnailCache;
     
+    // Evict oldest entries if cache is at capacity
+    const entries = Object.entries(cache);
+    if (entries.length >= MAX_CACHE_SIZE) {
+      // Sort by lastAccessedAt (or cachedAt as fallback), oldest first
+      entries.sort((a, b) => {
+        const timeA = a[1].lastAccessedAt ?? a[1].cachedAt;
+        const timeB = b[1].lastAccessedAt ?? b[1].cachedAt;
+        return timeA - timeB;
+      });
+      
+      // Remove oldest entries to make room (evict 10% to reduce frequent evictions)
+      const evictCount = Math.max(1, Math.floor(MAX_CACHE_SIZE * 0.1));
+      const entriesToRemove = entries.slice(0, evictCount);
+      
+      for (const [key] of entriesToRemove) {
+        delete cache[key];
+      }
+      
+      console.log(`THUMBNAIL_CACHE: Evicted ${entriesToRemove.length} oldest entries (LRU)`);
+    }
+    
+    const now = Date.now();
     const entry: ThumbnailCacheEntry = {
       base64DataUrl,
-      cachedAt: Date.now()
+      cachedAt: now,
+      lastAccessedAt: now
     };
     
     cache[mediaItemId] = entry;
@@ -84,18 +83,7 @@ async function cacheThumbnail(
   }
 }
 
-/**
- * Clears all cached thumbnails from chrome.storage.local
- * 
- * This should be called when the user logs out to ensure privacy
- * and free up storage space.
- * 
- * @example
- * ```typescript
- * // In logout handler
- * await clearThumbnailCache();
- * ```
- */
+/** Clears all cached thumbnails. Call on logout. */
 export async function clearThumbnailCache(): Promise<void> {
   try {
     await chrome.storage.local.remove('thumbnailCache');
@@ -105,13 +93,6 @@ export async function clearThumbnailCache(): Promise<void> {
   }
 }
 
-/**
- * Fetches thumbnail from Google Photos API and converts to Base64 Data URL
- * 
- * @param mediaItemId - Google Photos media item ID
- * @param token - OAuth 2.0 access token
- * @returns Base64 Data URL or null on failure
- */
 async function fetchThumbnailFromApi(
   mediaItemId: string,
   token: string
@@ -167,12 +148,6 @@ async function fetchThumbnailFromApi(
   }
 }
 
-/**
- * Converts Blob to Base64 Data URL
- * 
- * @param blob - Image blob
- * @returns Base64 Data URL string
- */
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -188,25 +163,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-/**
- * Gets thumbnail as Base64 Data URL (with caching)
- * 
- * This is the main function to use for displaying thumbnails.
- * It first checks the local cache, and only fetches from API if not cached.
- * After fetching, the thumbnail is cached for future use.
- * 
- * @param mediaItemId - Google Photos media item ID (stored in UploadRecord)
- * @param token - OAuth 2.0 access token from chrome.identity.getAuthToken()
- * @returns Promise resolving to Base64 Data URL or null on failure
- * 
- * @example
- * ```typescript
- * const dataUrl = await getThumbnailDataUrl('ABC123xyz', 'ya29.a0...');
- * if (dataUrl) {
- *   imgElement.src = dataUrl;
- * }
- * ```
- */
+/** Gets thumbnail as Base64 Data URL. Checks cache first, fetches from API if not cached. */
 export async function getThumbnailDataUrl(
   mediaItemId: string,
   token: string
@@ -229,12 +186,7 @@ export async function getThumbnailDataUrl(
   return dataUrl;
 }
 
-/**
- * @deprecated Use getThumbnailDataUrl instead. This function is kept for backward compatibility.
- * 
- * Fetches a fresh thumbnail URL from Google Photos Library API
- * Note: This returns a URL that expires in 60 minutes.
- */
+/** @deprecated Use getThumbnailDataUrl instead. Returns URL that expires in 60 minutes. */
 export async function getThumbnailUrl(
   mediaItemId: string,
   token: string

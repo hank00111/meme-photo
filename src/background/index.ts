@@ -10,8 +10,7 @@ chrome.runtime.onInstalled.addListener((details) => {
     installedAt: new Date().toISOString(),
   });
 
-  // CREATE CONTEXT MENU
-  // Remove all existing menus first to prevent duplicates on extension reload
+  // Remove existing menus to prevent duplicates on extension reload
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create(
       {
@@ -37,8 +36,7 @@ chrome.runtime.onStartup.addListener(() => {
   console.log("INFO: Extension started");
 });
 
-// Handle context menu clicks
-// NOTE: tab parameter is optional - may be undefined in some contexts (e.g., platform apps)
+// NOTE: tab parameter is optional - may be undefined in some contexts
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   console.log("MENU_CLICK: Context menu clicked");
   console.log("MENU_CLICK: Menu item ID:", info.menuItemId);
@@ -71,15 +69,25 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 /** Toast type for content script notifications */
 type ToastType = "success" | "error" | "info" | "warning" | "loading";
 
-/**
- * Show toast notification in the web page
- * Injects CSS and JS into the active tab and displays a toast message
- *
- * @param tabId - The ID of the tab to inject into
- * @param type - The type of toast
- * @param message - The message to display
- * @param toastId - Optional unique ID for the toast (required for loading toasts)
- */
+/** Check if URL is a restricted page where content scripts cannot be injected */
+function isRestrictedUrl(url: string | undefined): boolean {
+  if (!url) return true;
+  
+  const restrictedPrefixes = [
+    'chrome://',
+    'chrome-extension://',
+    'edge://',
+    'about:',
+    'moz-extension://',
+    'file://',
+    'data:',
+    'blob:'
+  ];
+  
+  return restrictedPrefixes.some(prefix => url.startsWith(prefix));
+}
+
+/** Inject toast CSS/JS into tab and display message */
 async function showToastInTab(
   tabId: number,
   type: ToastType,
@@ -87,6 +95,13 @@ async function showToastInTab(
   toastId?: string
 ): Promise<void> {
   try {
+    // Check if we can inject into this tab
+    const tab = await chrome.tabs.get(tabId);
+    if (isRestrictedUrl(tab.url)) {
+      console.log(`TOAST_SKIP: Cannot inject into restricted page: ${tab.url}`);
+      return;
+    }
+
     console.log(`TOAST_INJECT: Injecting toast into tab ${tabId}`);
 
     // Step 1: Inject CSS (only once per tab)
@@ -117,12 +132,6 @@ async function showToastInTab(
   }
 }
 
-/**
- * Dismiss a toast notification in the web page
- *
- * @param tabId - The ID of the tab
- * @param toastId - The unique ID of the toast to dismiss
- */
 async function dismissToastInTab(tabId: number, toastId: string): Promise<void> {
   try {
     // Send dismiss message to content script
@@ -137,13 +146,18 @@ async function dismissToastInTab(tabId: number, toastId: string): Promise<void> 
   }
 }
 
-// Main upload handler
 async function handleImageUpload(
   imageUrl: string,
   _pageUrl?: string,
   tab?: chrome.tabs.Tab
 ) {
   console.log("UPLOAD: Starting upload process...");
+
+  // Keep Service Worker alive during long upload operations
+  // Service Worker can terminate after 30 seconds of inactivity
+  const keepAliveInterval = setInterval(() => {
+    chrome.runtime.getPlatformInfo();
+  }, 25 * 1000);
 
   // Generate unique toast ID for this upload
   const uploadToastId = `upload-${Date.now()}`;
@@ -164,7 +178,6 @@ async function handleImageUpload(
   }
 
   try {
-    // Step 1: Get OAuth token
     const token = await getAuthToken();
     if (!token) {
       throw new Error(
@@ -172,13 +185,11 @@ async function handleImageUpload(
       );
     }
 
-    // Step 2: Download image
     const { blob, filename } = await downloadImage(imageUrl);
 
-    // Step 2.5: Strip EXIF metadata to ensure upload time is used by Google Photos
+    // Strip EXIF to ensure Google Photos uses upload time, not original photo time
     const processedBlob = await stripExifMetadata(blob);
 
-    // Step 3: Upload bytes to get upload token
     const uploadToken = await uploadImageBytes(processedBlob, token);
 
     const mediaItem = await createMediaItem(uploadToken, filename, token);
@@ -194,7 +205,7 @@ async function handleImageUpload(
       console.error("HISTORY_ERROR: Failed to save upload record:", error);
     }
 
-    // Step 4.6: Dismiss loading toast and show success toast
+    // Dismiss loading toast and show success
     if (tab?.id) {
       try {
         // Dismiss the loading toast first
@@ -228,21 +239,48 @@ async function handleImageUpload(
     }
     console.error("UPLOAD_ERROR:", error);
     throw error;
+  } finally {
+    // Always clean up keep-alive interval
+    clearInterval(keepAliveInterval);
+    console.log("UPLOAD: Keep-alive interval cleared");
   }
 }
 
-// Error notifications are now shown via web toast (showToastInTab)
-// Windows notification (chrome.notifications) has been removed
-
-// Download image from URL
 async function downloadImage(
   imageUrl: string
 ): Promise<{ blob: Blob; filename: string }> {
   console.log("DOWNLOAD: Fetching image from:", imageUrl);
 
+  // Validate URL protocol (only allow HTTP/HTTPS)
   try {
-    const response = await fetch(imageUrl);
+    const url = new URL(imageUrl);
+    if (!["http:", "https:"].includes(url.protocol)) {
+      throw new Error(`Unsupported protocol: ${url.protocol}. Only HTTP/HTTPS URLs are supported.`);
+    }
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(`Invalid URL: ${imageUrl}`);
+    }
+    throw error;
+  }
 
+  let response: Response;
+  try {
+    response = await fetch(imageUrl);
+  } catch (error) {
+    // TypeError is thrown for CORS errors and network failures
+    console.error("DOWNLOAD_ERROR: Fetch failed:", error);
+    if (error instanceof TypeError) {
+      throw new Error(
+        "Failed to download image: CORS restriction or network error. The image server may not allow cross-origin requests."
+      );
+    }
+    throw new Error(
+      `Failed to download image: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+
+  try {
     if (!response.ok) {
       throw new Error(
         `Failed to download image: ${response.status} ${response.statusText}`
@@ -284,15 +322,10 @@ async function downloadImage(
     return { blob, filename };
   } catch (error) {
     console.error("DOWNLOAD_ERROR:", error);
-    throw new Error(
-      `Failed to download image: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
-    );
+    throw error; // Re-throw as-is since we've already formatted the error
   }
 }
 
-// Extract filename from URL
 function extractFilename(url: string): string | null {
   try {
     const urlObj = new URL(url);
@@ -313,7 +346,6 @@ function extractFilename(url: string): string | null {
   return null;
 }
 
-// Generate filename based on MIME type
 function generateFilename(mimeType: string): string {
   const timestamp = Date.now();
   const extensions: Record<string, string> = {
@@ -332,9 +364,38 @@ function generateFilename(mimeType: string): string {
   return `meme-photo-${timestamp}.${ext}`;
 }
 
-// Get OAuth token (non-interactive for upload)
-// Uses cached token from previous authentication (e.g., testAuth() or user login)
-// Returns null if no cached token exists - caller should handle gracefully
+/** Validate OAuth token by calling userinfo endpoint */
+async function validateToken(token: string): Promise<boolean> {
+  try {
+    const response = await fetch('https://www.googleapis.com/oauth2/v3/tokeninfo', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      console.log('AUTH: Token validation failed:', response.status);
+      return false;
+    }
+    
+    const data = await response.json();
+    // Check if token expires within 5 minutes
+    const expiresIn = parseInt(data.expires_in, 10);
+    if (isNaN(expiresIn) || expiresIn < 300) {
+      console.log('AUTH: Token expires soon or invalid expires_in:', data.expires_in);
+      return false;
+    }
+    
+    console.log('AUTH: Token validated, expires in', expiresIn, 'seconds');
+    return true;
+  } catch (error) {
+    console.error('AUTH: Token validation error:', error);
+    return false;
+  }
+}
+
+/** Get cached OAuth token (non-interactive). Returns null if unavailable. */
 async function getAuthToken(): Promise<string | null> {
   try {
     const result = await chrome.identity.getAuthToken({ interactive: false });
@@ -344,7 +405,26 @@ async function getAuthToken(): Promise<string | null> {
       return null;
     }
 
-    console.log("AUTH: Retrieved cached token");
+    // Validate token before returning
+    const isValid = await validateToken(result.token);
+    if (!isValid) {
+      console.log('AUTH: Token invalid or expired, removing from cache');
+      await chrome.identity.removeCachedAuthToken({ token: result.token });
+      
+      // Try to get a new token interactively
+      console.log('AUTH: Attempting interactive token refresh');
+      const newResult = await chrome.identity.getAuthToken({ interactive: true });
+      
+      if (!newResult.token) {
+        console.warn('AUTH_WARNING: Interactive token request failed');
+        return null;
+      }
+      
+      console.log('AUTH: New token obtained via interactive flow');
+      return newResult.token;
+    }
+
+    console.log("AUTH: Retrieved and validated cached token");
     return result.token;
   } catch (error) {
     console.error("AUTH_ERROR: Failed to get auth token:", error);
@@ -352,7 +432,6 @@ async function getAuthToken(): Promise<string | null> {
   }
 }
 
-// Upload image bytes (Phase 1)
 async function uploadImageBytes(blob: Blob, token: string): Promise<string> {
   console.log("API_UPLOAD: Uploading bytes...");
 
@@ -381,7 +460,6 @@ async function uploadImageBytes(blob: Blob, token: string): Promise<string> {
   return uploadToken;
 }
 
-// TypeScript interface for Google Photos MediaItem
 interface GooglePhotosMediaItem {
   id: string;
   productUrl: string;
@@ -390,7 +468,6 @@ interface GooglePhotosMediaItem {
   filename: string;
 }
 
-// Create media item (Phase 2)
 async function createMediaItem(
   uploadToken: string,
   filename: string,
@@ -440,13 +517,3 @@ async function createMediaItem(
 
   return itemResult.mediaItem;
 }
-
-// Test OAuth authentication
-// Listen for messages from popup
-// Placeholder for future message handlers - currently no messages are handled
-// Commented out to avoid unused parameter errors
-// chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-//   return false;
-// });
-
-// Notification button clicks removed - using web toast notifications instead
