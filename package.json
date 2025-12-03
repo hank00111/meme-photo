@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "clean": "rimraf public/content public/styles dist"
   },
   "dependencies": {
     "react": "^19.2.0",
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.2.1",
     "@eslint/js": "^9.39.1",
+    "@rollup-extras/plugin-copy": "^1.11.1",
     "@types/chrome": "^0.0.312",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.2",

@@ -68,6 +68,36 @@ export interface AlbumCache {
 }
 
 /**
+ * Thumbnail Cache Entry Interface
+ * 
+ * Represents a single cached thumbnail image.
+ * Thumbnails are stored as Base64 Data URLs to avoid repeated API calls,
+ * since Google Photos baseUrl expires after 60 minutes but image content is permanent.
+ */
+export interface ThumbnailCacheEntry {
+  /** Base64 encoded image data (e.g., "data:image/jpeg;base64,...") */
+  base64DataUrl: string;
+  
+  /** Timestamp when this thumbnail was cached (for debugging purposes) */
+  cachedAt: number;
+}
+
+/**
+ * Thumbnail Cache Interface
+ * 
+ * Caches thumbnail images as Base64 Data URLs.
+ * Key: mediaItemId, Value: ThumbnailCacheEntry
+ * 
+ * Storage estimation:
+ * - Each 48x48 thumbnail: ~3-7 KB as Base64
+ * - 50 records maximum: ~150-350 KB
+ * - Well within 10 MB chrome.storage.local limit
+ */
+export interface ThumbnailCache {
+  [mediaItemId: string]: ThumbnailCacheEntry;
+}
+
+/**
  * Storage Schema Interface
  * 
  * Defines the complete structure of chrome.storage.local data.
@@ -108,6 +138,15 @@ export interface StorageSchema {
    * Optional: undefined if no albums have been cached yet
    */
   albumCache?: AlbumCache;
+  
+  /**
+   * Cached thumbnail images as Base64 Data URLs
+   * Optional: undefined if no thumbnails have been cached yet
+   * 
+   * Cleared on user logout to ensure privacy.
+   * Key: mediaItemId, Value: ThumbnailCacheEntry with base64DataUrl
+   */
+  thumbnailCache?: ThumbnailCache;
 }
 
 /**

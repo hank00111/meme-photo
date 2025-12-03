@@ -4,6 +4,10 @@
  * Simple DOM-based toast notifications with auto-dismiss.
  * No external dependencies, uses pure CSS transitions.
  * 
+ * Features:
+ * - Maximum visible toasts limit (prevents stacking overflow)
+ * - Duplicate message prevention (same message won't show twice)
+ * 
  * @example
  * ```typescript
  * import { showToast, ERROR_MESSAGES } from '../utils/toast';
@@ -12,6 +16,12 @@
  * showToast('Upload successful!', 'success');
  * ```
  */
+
+/**
+ * Maximum number of visible toasts at once
+ * Based on Sonner library best practice (default: 3)
+ */
+const MAX_VISIBLE_TOASTS = 3;
 
 /**
  * Toast notification types
@@ -54,12 +64,30 @@ export function showToast(
     document.body.appendChild(container);
   }
 
+  // Duplicate message prevention: skip if same message already exists
+  const existingToasts = container.querySelectorAll('.toast');
+  for (const existing of existingToasts) {
+    if (existing.getAttribute('data-message') === message) {
+      // Same message already showing, skip
+      return;
+    }
+  }
+
+  // Remove oldest toasts if exceeding limit
+  while (container.children.length >= MAX_VISIBLE_TOASTS) {
+    const oldest = container.firstChild;
+    if (oldest) {
+      oldest.remove();
+    }
+  }
+
   // Create toast element
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
   toast.setAttribute('role', 'alert');
   toast.setAttribute('aria-live', 'polite');
+  toast.setAttribute('data-message', message); // For duplicate detection
 
   // Add to container
   container.appendChild(toast);

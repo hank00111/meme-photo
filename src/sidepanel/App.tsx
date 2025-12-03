@@ -5,6 +5,7 @@ import AuthOverlay from '../components/AuthOverlay'
 import UserAvatar from '../components/UserAvatar'
 import UploadHistory from '../components/UploadHistory'
 import { getUserProfile, clearUserProfile } from '../utils/userProfile'
+import { clearThumbnailCache } from '../utils/thumbnailCache'
 import { showError } from '../utils/toast'
 import type { UserProfile } from '../types/storage'
 
@@ -98,6 +99,8 @@ function App() {
       await chrome.identity.clearAllCachedAuthTokens()
       console.log('AUTH: All cached tokens cleared')
       await clearUserProfile()
+      await clearThumbnailCache()
+      console.log('AUTH: Thumbnail cache cleared')
       await chrome.storage.local.set({ isManuallyLoggedOut: true })
       setUserProfile(null)
       setIsAuthorized(false)

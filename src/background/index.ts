@@ -1,4 +1,5 @@
 import { addUploadRecord } from "../utils/uploadHistory";
+import { stripExifMetadata } from "../utils/imageProcessor";
 
 console.log("INFO: Meme Photo extension loaded");
 
@@ -51,20 +52,116 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       .then(() => {
         console.log("UPLOAD_SUCCESS: Image uploaded successfully");
       })
-      .catch((error) => {
+      .catch(async (error) => {
         console.error("UPLOAD_ERROR: Upload failed:", error);
-        showErrorNotification(error.message);
+        // Show error toast in web page if tab is available
+        if (tab?.id) {
+          try {
+            await showToastInTab(tab.id, "error", error.message || "Upload failed");
+          } catch (toastError) {
+            console.error("TOAST_ERROR: Failed to show error toast:", toastError);
+          }
+        } else {
+          console.log("TOAST_SKIP: No tab ID available for error toast");
+        }
       });
   }
 });
 
+/** Toast type for content script notifications */
+type ToastType = "success" | "error" | "info" | "warning" | "loading";
+
+/**
+ * Show toast notification in the web page
+ * Injects CSS and JS into the active tab and displays a toast message
+ *
+ * @param tabId - The ID of the tab to inject into
+ * @param type - The type of toast
+ * @param message - The message to display
+ * @param toastId - Optional unique ID for the toast (required for loading toasts)
+ */
+async function showToastInTab(
+  tabId: number,
+  type: ToastType,
+  message: string,
+  toastId?: string
+): Promise<void> {
+  try {
+    console.log(`TOAST_INJECT: Injecting toast into tab ${tabId}`);
+
+    // Step 1: Inject CSS (only once per tab)
+    await chrome.scripting.insertCSS({
+      target: { tabId },
+      files: ["styles/toast-content-script.css"],
+    });
+    console.log("TOAST_INJECT: CSS injected successfully");
+
+    // Step 2: Inject toast script
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["content/toast-injector.js"],
+    });
+    console.log("TOAST_INJECT: Script injected successfully");
+
+    // Step 3: Send message to show toast
+    await chrome.tabs.sendMessage(tabId, {
+      action: "showToast",
+      type: type,
+      message: message,
+      toastId: toastId,
+    });
+    console.log(`TOAST_INJECT: Toast message sent (${type})`);
+  } catch (error) {
+    console.error("TOAST_INJECT_ERROR: Failed to inject toast:", error);
+    // Don't throw - toast injection failure shouldn't break the upload flow
+  }
+}
+
+/**
+ * Dismiss a toast notification in the web page
+ *
+ * @param tabId - The ID of the tab
+ * @param toastId - The unique ID of the toast to dismiss
+ */
+async function dismissToastInTab(tabId: number, toastId: string): Promise<void> {
+  try {
+    // Send dismiss message to content script
+    await chrome.tabs.sendMessage(tabId, {
+      action: "dismissToast",
+      toastId: toastId,
+    });
+    console.log(`TOAST_DISMISS: Toast dismissed (${toastId})`);
+  } catch (error) {
+    // Tab may have navigated away or been closed - this is expected
+    console.log("TOAST_DISMISS: Could not dismiss toast (tab may have navigated):", error);
+  }
+}
+
 // Main upload handler
 async function handleImageUpload(
   imageUrl: string,
-  pageUrl?: string,
+  _pageUrl?: string,
   tab?: chrome.tabs.Tab
 ) {
   console.log("UPLOAD: Starting upload process...");
+
+  // Generate unique toast ID for this upload
+  const uploadToastId = `upload-${Date.now()}`;
+
+  // Show loading toast if tab is available
+  if (tab?.id) {
+    try {
+      await showToastInTab(
+        tab.id,
+        "loading",
+        "Uploading to Google Photos...",
+        uploadToastId
+      );
+    } catch (error) {
+      console.error("TOAST_ERROR: Failed to show loading toast:", error);
+      // Continue execution - toast failure shouldn't break the upload flow
+    }
+  }
 
   try {
     // Step 1: Get OAuth token
@@ -78,13 +175,14 @@ async function handleImageUpload(
     // Step 2: Download image
     const { blob, filename } = await downloadImage(imageUrl);
 
-    // Step 3: Upload bytes to get upload token
-    const uploadToken = await uploadImageBytes(blob, token);
+    // Step 2.5: Strip EXIF metadata to ensure upload time is used by Google Photos
+    const processedBlob = await stripExifMetadata(blob);
 
-    // Step 4: Create media item
+    // Step 3: Upload bytes to get upload token
+    const uploadToken = await uploadImageBytes(processedBlob, token);
+
     const mediaItem = await createMediaItem(uploadToken, filename, token);
 
-    // Step 4.5: Save upload record
     try {
       await addUploadRecord({
         filename: filename,
@@ -96,40 +194,45 @@ async function handleImageUpload(
       console.error("HISTORY_ERROR: Failed to save upload record:", error);
     }
 
-    // Step 5: Show success notification
-    showSuccessNotification(mediaItem, filename);
+    // Step 4.6: Dismiss loading toast and show success toast
+    if (tab?.id) {
+      try {
+        // Dismiss the loading toast first
+        await dismissToastInTab(tab.id, uploadToastId);
+        
+        // Show success toast
+        await showToastInTab(
+          tab.id,
+          "success",
+          "Image uploaded to Google Photos"
+        );
+      } catch (error) {
+        console.error("TOAST_ERROR: Failed to show toast notification:", error);
+        // Continue execution - toast failure shouldn't break the upload flow
+      }
+    } else {
+      console.log("TOAST_SKIP: No tab ID available, skipping web toast");
+    }
+
+    // Web toast is already shown in Step 4.6
     console.log("UPLOAD_SUCCESS: Media item created -", mediaItem.id);
     console.log("UPLOAD_SUCCESS: Product URL -", mediaItem.productUrl);
   } catch (error) {
+    // Dismiss loading toast and show error instead
+    if (tab?.id) {
+      try {
+        await dismissToastInTab(tab.id, uploadToastId);
+      } catch {
+        // Ignore dismiss errors
+      }
+    }
     console.error("UPLOAD_ERROR:", error);
     throw error;
   }
 }
 
-// Show success notification
-function showSuccessNotification(mediaItem: any, filename: string) {
-  chrome.notifications.create({
-    type: "basic",
-    iconUrl:
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-    title: "Upload Successful",
-    message: `${filename} uploaded to Google Photos`,
-    buttons: [{ title: "View in Google Photos" }],
-    priority: 1,
-  });
-}
-
-// Show error notification
-function showErrorNotification(errorMessage: string) {
-  chrome.notifications.create({
-    type: "basic",
-    iconUrl:
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-    title: "Upload Failed",
-    message: errorMessage,
-    priority: 2,
-  });
-}
+// Error notifications are now shown via web toast (showToastInTab)
+// Windows notification (chrome.notifications) has been removed
 
 // Download image from URL
 async function downloadImage(
@@ -278,12 +381,21 @@ async function uploadImageBytes(blob: Blob, token: string): Promise<string> {
   return uploadToken;
 }
 
+// TypeScript interface for Google Photos MediaItem
+interface GooglePhotosMediaItem {
+  id: string;
+  productUrl: string;
+  baseUrl: string;
+  mimeType: string;
+  filename: string;
+}
+
 // Create media item (Phase 2)
 async function createMediaItem(
   uploadToken: string,
   filename: string,
   token: string
-): Promise<any> {
+): Promise<GooglePhotosMediaItem> {
   console.log("API_CREATE: Creating media item...");
 
   const response = await fetch(
@@ -331,16 +443,10 @@ async function createMediaItem(
 
 // Test OAuth authentication
 // Listen for messages from popup
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  // Reserved for future message handlers
-  return false;
-});
+// Placeholder for future message handlers - currently no messages are handled
+// Commented out to avoid unused parameter errors
+// chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+//   return false;
+// });
 
-// Handle notification button clicks
-chrome.notifications.onButtonClicked.addListener(
-  (notificationId, buttonIndex) => {
-    if (buttonIndex === 0) {
-      chrome.tabs.create({ url: "https://photos.google.com" });
-    }
-  }
-);
+// Notification button clicks removed - using web toast notifications instead

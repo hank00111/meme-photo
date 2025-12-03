@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
-import { getThumbnailUrl } from '../utils/thumbnailCache';
+import { getThumbnailDataUrl } from '../utils/thumbnailCache';
 import { showError } from '../utils/toast';
 
 /**
  * ThumbnailImage Component
  * 
  * Displays thumbnail images for upload records with proper loading and error states.
- * Handles Google Photos baseUrl 60-minute expiration by dynamically fetching fresh URLs.
+ * Uses local caching to avoid repeated API calls (Base64 Data URLs stored in chrome.storage.local).
  * 
  * Features:
  * - Skeleton loading state with shimmer animation
  * - 48x48px thumbnail display
  * - Error fallback with icon + filename
  * - Automatic OAuth token management
- * - Dynamic baseUrl fetching via getThumbnailUrl()
+ * - Local thumbnail caching via getThumbnailDataUrl()
+ * - No network requests for cached thumbnails
  * 
  * @param mediaItemId - Google Photos media item ID from UploadRecord
  * @param filename - Original filename for error fallback display
@@ -32,13 +33,15 @@ export default function ThumbnailImage({
   const [hasError, setHasError] = useState(false);
 
   /**
-   * Fetch thumbnail URL on component mount
+   * Fetch thumbnail on component mount (with local caching)
    * 
    * Process:
    * 1. Get OAuth token from chrome.identity
-   * 2. Call getThumbnailUrl() to fetch fresh baseUrl from Google Photos API
-   * 3. Append size parameter (=w200-h200) for thumbnail dimensions
-   * 4. Handle errors gracefully (show fallback)
+   * 2. Call getThumbnailDataUrl() which:
+   *    - First checks local cache (chrome.storage.local)
+   *    - If cached, returns Base64 Data URL immediately (no network request)
+   *    - If not cached, fetches from API and caches for future use
+   * 3. Handle errors gracefully (show fallback)
    */
   useEffect(() => {
     let isMounted = true;
@@ -58,16 +61,16 @@ export default function ThumbnailImage({
           return;
         }
 
-        // Step 2: Fetch fresh thumbnail URL from Google Photos API
-        const url = await getThumbnailUrl(mediaItemId, result.token);
+        // Step 2: Get thumbnail (from cache or API)
+        const dataUrl = await getThumbnailDataUrl(mediaItemId, result.token);
 
         if (!isMounted) return;
 
-        if (url) {
-          setThumbnailUrl(url);
+        if (dataUrl) {
+          setThumbnailUrl(dataUrl);
           setIsLoading(false);
         } else {
-          console.error('THUMBNAIL: getThumbnailUrl returned null for mediaItemId:', mediaItemId);
+          console.error('THUMBNAIL: getThumbnailDataUrl returned null for mediaItemId:', mediaItemId);
           showError('THUMBNAIL_LOAD_FAILED');
           setHasError(true);
           setIsLoading(false);

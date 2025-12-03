@@ -1,0 +1,130 @@
+/**
+ * Toast Content Script Styles
+ * 
+ * This CSS file is specifically designed for injection into web pages via chrome.scripting.insertCSS.
+ * It provides toast notification styles with critical isolation patterns to prevent conflicts
+ * with host page CSS.
+ * 
+ * Key Design Decisions:
+ * 1. Unique Prefix: All selectors use 'meme-photo-' prefix to avoid naming conflicts
+ * 2. Maximum Z-Index: 2147483647 (32-bit max) ensures notifications always appear on top
+ * 3. Direct Values: CSS variables replaced with actual values (content scripts can't access extension CSS vars)
+ * 4. !important Flags: Critical positioning/display properties use !important to prevent override
+ * 
+ * Original Source: src/styles/components.css (lines 470-527)
+ * Extracted: 2025-12-03
+ * 
+ * Related Files:
+ * - src/utils/toastContentScript.ts (uses these class names)
+ * - src/content/toast-injector.ts (injects this CSS)
+ * 
+ * Technical Notes:
+ * - Injected dynamically only when needed (context menu click)
+ * - Works with host_permissions: ["<all_urls>"] (manifest.json:26)
+ * - Requires "scripting" permission (to be added in Phase 6.4)
+ */
+
+/* ===== TOAST CONTAINER ===== */
+
+#meme-photo-toast-container {
+  position: fixed !important;
+  top: 16px !important;          /* var(--spacing-md) */
+  right: 16px !important;         /* var(--spacing-md) */
+  z-index: 2147483647 !important; /* Maximum 32-bit integer - always on top */
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;            /* var(--spacing-sm) */
+  pointer-events: none !important;
+}
+
+/* ===== BASE TOAST STYLES ===== */
+
+.meme-photo-toast {
+  background-color: #fcf7e1;    /* var(--color-bg-secondary) */
+  color: #282d27;               /* var(--color-text-primary) */
+  padding: 10px;           /* reduced height by 2px top/bottom */
+  border-radius: 8px;           /* var(--radius-md) */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: auto ;
+  max-width: 260px;
+  font-size: 14px;
+  line-height: 1.4;
+  pointer-events: auto;
+  transform: translateX(400px);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  font-family: 'Noto Sans JP', sans-serif; /* Match extension UI font */
+}
+
+/* ===== TOAST STATE TRANSITIONS ===== */
+
+/* Toast visible state (slide in from right) */
+.meme-photo-toast-visible {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* Toast hiding state (slide out to right) */
+.meme-photo-toast-hiding {
+  transform: translateX(400px);
+  opacity: 0;
+}
+
+/* ===== TOAST TYPE VARIANTS ===== */
+
+/* Success toast - Green background for positive actions */
+.meme-photo-toast-success {
+  background-color: #469238 !important; /* var(--color-brand-green) */
+  color: white !important;
+}
+
+/* Error toast - Red background for failures */
+.meme-photo-toast-error {
+  background-color: #dc3545 !important;
+  color: white !important;
+}
+
+/* Info toast - Light blue background for informational messages */
+.meme-photo-toast-info {
+  background-color: #0dcaf0 !important;
+  color: white !important;
+}
+
+/* Warning toast - Yellow background for warnings */
+.meme-photo-toast-warning {
+  background-color: #ffc107 !important;
+  color: #000 !important;
+}
+
+/* ===== LOADING TOAST ===== */
+
+/* Loading toast - Blue background with spinner */
+.meme-photo-toast-loading {
+  background-color: #0d6efd !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+/* Spinner animation for loading toast */
+.meme-photo-toast-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: meme-photo-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+/* Spinner keyframes animation */
+@keyframes meme-photo-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
