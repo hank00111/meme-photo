@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Meme Photo",
-  "version": "0.0.16",
+  "version": "0.0.20",
   "description": "Upload images to Google Photos from context menu",
   "oauth2": {
     "client_id": "YOUR_CLIENT_ID_HERE.apps.googleusercontent.com",
@@ -23,10 +23,11 @@
     "storage",
     "contextMenus",
     "sidePanel",
-    "notifications"
+    "scripting"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "https://*/*",
+    "http://*/*"
   ],
   "background": {
     "service_worker": "src/background/index.ts",
