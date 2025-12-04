@@ -1,6 +1,9 @@
 import { addUploadRecord } from "../utils/uploadHistory";
 import { stripExifMetadata } from "../utils/imageProcessor";
 
+// Upload queue using Promise chain pattern to prevent concurrent write errors
+let uploadQueue: Promise<void> = Promise.resolve();
+
 console.log("INFO: Meme Photo extension loaded");
 
 chrome.runtime.onInstalled.addListener((details) => {
@@ -46,23 +49,42 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     console.log("MENU_CLICK: Page URL:", info.pageUrl);
     console.log("MENU_CLICK: Tab ID:", tab?.id);
 
-    handleImageUpload(info.srcUrl, info.pageUrl, tab)
-      .then(() => {
+    // Capture values before async chain to preserve type narrowing
+    const imageUrl = info.srcUrl;
+    const pageUrl = info.pageUrl;
+
+    // Chain upload to queue instead of executing immediately
+    uploadQueue = uploadQueue
+      .then(async () => {
+        console.log("QUEUE: Processing upload from queue");
+        await handleImageUpload(imageUrl, pageUrl, tab);
         console.log("UPLOAD_SUCCESS: Image uploaded successfully");
       })
       .catch(async (error) => {
-        console.error("UPLOAD_ERROR: Upload failed:", error);
+        console.error("QUEUE_ERROR: Upload failed in queue:", error);
         // Show error toast in web page if tab is available
         if (tab?.id) {
           try {
-            await showToastInTab(tab.id, "error", error.message || "Upload failed");
+            await showToastInTab(
+              tab.id,
+              "error",
+              error.message || "Upload failed"
+            );
           } catch (toastError) {
-            console.error("TOAST_ERROR: Failed to show error toast:", toastError);
+            console.error(
+              "TOAST_ERROR: Failed to show error toast:",
+              toastError
+            );
           }
         } else {
           console.log("TOAST_SKIP: No tab ID available for error toast");
         }
+      })
+      .finally(() => {
+        console.log("QUEUE: Upload completed, queue ready for next");
       });
+
+    console.log("QUEUE: Upload added to queue");
   }
 });
 
@@ -192,7 +214,15 @@ async function handleImageUpload(
 
     const uploadToken = await uploadImageBytes(processedBlob, token);
 
-    const mediaItem = await createMediaItem(uploadToken, filename, token);
+    // Read selected album ID from storage (Phase 7.4)
+    const storageResult = await chrome.storage.sync.get('selectedAlbumId');
+    const albumId = (storageResult.selectedAlbumId as string | undefined) || null;
+
+    console.log('UPLOAD: Using album destination', {
+      albumId: albumId || 'Main Library',
+    });
+
+    const mediaItem = await createMediaItem(uploadToken, filename, token, albumId || undefined);
 
     try {
       await addUploadRecord({
@@ -471,9 +501,13 @@ interface GooglePhotosMediaItem {
 async function createMediaItem(
   uploadToken: string,
   filename: string,
-  token: string
+  token: string,
+  albumId?: string
 ): Promise<GooglePhotosMediaItem> {
-  console.log("API_CREATE: Creating media item...");
+  console.log("API_CREATE: Creating media item...", {
+    filename,
+    albumId: albumId || 'Main Library',
+  });
 
   const response = await fetch(
     "https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate",
@@ -484,6 +518,7 @@ async function createMediaItem(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        ...(albumId && { albumId }), // Add albumId to request body if provided
         newMediaItems: [
           {
             simpleMediaItem: {

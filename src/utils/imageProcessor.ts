@@ -1,100 +1,46 @@
 /**
- * Image Processor Utility
- * 
- * Handles EXIF metadata manipulation to ensure uploaded images
- * display the correct upload time in Google Photos.
- * 
- * APPROACH (Binary EXIF Replacement):
- * For JPEG images, we:
- * 1. Remove existing EXIF data from the binary
- * 2. Insert a minimal EXIF segment with current LOCAL datetime
- * 
- * This preserves the original file size and quality while ensuring
- * Google Photos displays the correct upload time (not UTC).
+ * EXIF metadata manipulation for Google Photos uploads.
+ * For JPEG: removes existing EXIF and inserts minimal segment with current local datetime.
  * 
  * @see https://en.wikipedia.org/wiki/JPEG#Syntax_and_structure
  * @see https://www.media.mit.edu/pia/Research/deepview/exif.html
  */
 
-/**
- * JPEG marker constants
- */
-const JPEG_APP1 = 0xFFE1; // EXIF data marker
-const JPEG_SOS = 0xFFDA;  // Start of Scan (image data starts after this)
+const JPEG_APP1 = 0xFFE1; // EXIF marker
+const JPEG_SOS = 0xFFDA;  // Start of Scan
 
 /**
- * Remove EXIF metadata and insert current local datetime
- * 
- * For JPEG images: Uses binary manipulation to:
- * 1. Remove existing EXIF segments
- * 2. Insert minimal EXIF with current local datetime
- * 
- * For other formats: Returns original blob as-is.
- * 
- * @param blob - Original image blob (may contain EXIF)
- * @returns New blob with updated EXIF datetime
+ * Strip EXIF and insert current local datetime. Non-JPEG formats returned unchanged.
  */
 export async function stripExifMetadata(blob: Blob): Promise<Blob> {
-  const mimeType = blob.type;
-  
-  // Only process JPEG images with binary manipulation
-  if (mimeType === 'image/jpeg') {
-    console.log(`EXIF_STRIP: Processing JPEG image (${blob.size} bytes)`);
-    
+  if (blob.type === 'image/jpeg') {
     try {
-      const processedBlob = await replaceJpegExifWithCurrentTime(blob);
-      
-      // Log size difference
-      const sizeDiff = processedBlob.size - blob.size;
-      console.log(`EXIF_STRIP: Processing complete. Size change: ${sizeDiff} bytes`);
-      console.log(`EXIF_STRIP: Original: ${blob.size} bytes -> Result: ${processedBlob.size} bytes`);
-      
-      return processedBlob;
-    } catch (error) {
-      console.error('EXIF_STRIP_ERROR: Binary processing failed:', error);
-      console.log('EXIF_STRIP: Returning original blob');
+      return await replaceJpegExifWithCurrentTime(blob);
+    } catch {
       return blob;
     }
   }
-  
-  // For non-JPEG formats, return original
-  console.log(`EXIF_STRIP: Non-JPEG format (${mimeType}), passing through original`);
   return blob;
 }
 
-/**
- * Replace EXIF data in JPEG with minimal EXIF containing current local time
- * 
- * @param blob - Original JPEG blob
- * @returns JPEG blob with updated EXIF datetime
- */
+/** Replace EXIF data in JPEG with minimal EXIF containing current local time */
 async function replaceJpegExifWithCurrentTime(blob: Blob): Promise<Blob> {
   const arrayBuffer = await blob.arrayBuffer();
   const data = new Uint8Array(arrayBuffer);
   
-  // Verify JPEG signature (FFD8)
   if (data[0] !== 0xFF || data[1] !== 0xD8) {
     throw new Error('Not a valid JPEG file');
   }
   
-  // Build new image:
-  // 1. SOI marker
-  // 2. New minimal EXIF segment with current datetime
-  // 3. All other segments except old APP1 (EXIF)
   const segments: Uint8Array[] = [];
+  segments.push(new Uint8Array([0xFF, 0xD8])); // SOI
   
-  // Add SOI marker
-  segments.push(new Uint8Array([0xFF, 0xD8]));
-  
-  // Add new minimal EXIF with current local datetime
   const exifSegment = createMinimalExifSegment();
   segments.push(exifSegment);
-  console.log(`EXIF_STRIP: Created new EXIF segment (${exifSegment.length} bytes) with current local time`);
   
-  let offset = 2; // Skip SOI
+  let offset = 2;
   
   while (offset < data.length) {
-    // Check for marker
     if (data[offset] !== 0xFF) {
       offset++;
       continue;
@@ -102,26 +48,18 @@ async function replaceJpegExifWithCurrentTime(blob: Blob): Promise<Blob> {
     
     const marker = (data[offset] << 8) | data[offset + 1];
     
-    // End of Image
-    if (marker === 0xFFD9) {
+    if (marker === 0xFFD9 || marker === JPEG_SOS) {
       segments.push(data.slice(offset));
       break;
     }
     
-    // Start of Scan - rest of file is image data
-    if (marker === JPEG_SOS) {
-      segments.push(data.slice(offset));
-      break;
-    }
-    
-    // Skip standalone markers (no length field)
-    if (marker >= 0xFFD0 && marker <= 0xFFD7) { // RST0-RST7
+    // RST0-RST7: standalone markers without length field
+    if (marker >= 0xFFD0 && marker <= 0xFFD7) {
       segments.push(data.slice(offset, offset + 2));
       offset += 2;
       continue;
     }
     
-    // For markers with length field
     if (offset + 4 > data.length) {
       break;
     }
@@ -130,27 +68,20 @@ async function replaceJpegExifWithCurrentTime(blob: Blob): Promise<Blob> {
     const segmentEnd = offset + 2 + segmentLength;
     
     if (segmentEnd > data.length) {
-      console.warn('EXIF_STRIP: Invalid segment length, stopping parse');
       segments.push(data.slice(offset));
       break;
     }
     
-    // Check if this is APP1 (EXIF) segment - SKIP IT
-    if (marker === JPEG_APP1) {
-      const exifHeader = String.fromCharCode(...data.slice(offset + 4, offset + 10));
-      if (exifHeader.startsWith('Exif')) {
-        console.log(`EXIF_STRIP: Removing old EXIF segment (${segmentLength} bytes)`);
-        offset = segmentEnd;
-        continue;
-      }
+    // Skip existing EXIF segment
+    if (marker === JPEG_APP1 && String.fromCharCode(...data.slice(offset + 4, offset + 10)).startsWith('Exif')) {
+      offset = segmentEnd;
+      continue;
     }
     
-    // Copy this segment
     segments.push(data.slice(offset, segmentEnd));
     offset = segmentEnd;
   }
   
-  // Combine all segments
   const totalLength = segments.reduce((sum, seg) => sum + seg.length, 0);
   const result = new Uint8Array(totalLength);
   let resultOffset = 0;
@@ -164,132 +95,99 @@ async function replaceJpegExifWithCurrentTime(blob: Blob): Promise<Blob> {
 }
 
 /**
- * Create a minimal EXIF APP1 segment with current local datetime
- * 
- * EXIF Structure:
- * - APP1 marker (FFE1)
- * - Length (2 bytes, big-endian)
- * - "Exif\0\0" (6 bytes)
- * - TIFF header (8 bytes)
- * - IFD0 (contains pointer to EXIF IFD)
- * - EXIF IFD (contains DateTimeOriginal)
- * 
- * @returns Uint8Array containing complete APP1 segment
+ * Create minimal EXIF APP1 segment with current local datetime.
+ * Structure: APP1 marker + Length + "Exif\0\0" + TIFF header + IFD0 + EXIF IFD
  */
 function createMinimalExifSegment(): Uint8Array {
-  // Get current local datetime in EXIF format: "YYYY:MM:DD HH:MM:SS"
   const now = new Date();
   const dateTimeStr = formatExifDateTime(now);
-  console.log(`EXIF_STRIP: Setting EXIF DateTime to: ${dateTimeStr}`);
+  const dateTimeBytes = new TextEncoder().encode(dateTimeStr + '\0'); // 19 chars + null
   
-  // DateTime string is 19 chars + null terminator = 20 bytes
-  const dateTimeBytes = new TextEncoder().encode(dateTimeStr + '\0');
-  
-  // Build EXIF data (little-endian for Intel byte order)
-  // Structure:
-  // - TIFF header: "II" (little-endian) + 0x002A + offset to IFD0 (8)
-  // - IFD0: 1 entry (pointer to EXIF IFD) + next IFD offset (0)
-  // - EXIF IFD: 3 entries (DateTimeOriginal, DateTimeDigitized, DateTime)
-  
-  // Calculate offsets (relative to TIFF header start)
   const ifd0Offset = 8;
   const ifd0Entries = 1;
-  const ifd0Size = 2 + (ifd0Entries * 12) + 4; // entry count + entries + next IFD offset
+  const ifd0Size = 2 + (ifd0Entries * 12) + 4;
   const exifIfdOffset = ifd0Offset + ifd0Size;
   const exifIfdEntries = 3;
   const exifIfdSize = 2 + (exifIfdEntries * 12) + 4;
   const dateTimeDataOffset = exifIfdOffset + exifIfdSize;
-  
-  // Total TIFF data size
   const tiffDataSize = dateTimeDataOffset + (dateTimeBytes.length * 3);
+  const app1DataSize = 6 + tiffDataSize; // "Exif\0\0" + TIFF data
   
-  // Total APP1 size = "Exif\0\0" (6) + TIFF data
-  const app1DataSize = 6 + tiffDataSize;
-  
-  // Build the segment
   const segment = new Uint8Array(2 + 2 + app1DataSize);
   const view = new DataView(segment.buffer);
   let pos = 0;
   
-  // APP1 marker
+  // APP1 marker + length
   segment[pos++] = 0xFF;
   segment[pos++] = 0xE1;
-  
-  // Length (includes length bytes itself)
-  view.setUint16(pos, app1DataSize + 2, false); // big-endian for JPEG
+  view.setUint16(pos, app1DataSize + 2, false);
   pos += 2;
   
-  // Exif header "Exif\0\0"
+  // EXIF header
   segment.set(new TextEncoder().encode('Exif\0\0'), pos);
   pos += 6;
-  
   const tiffStart = pos;
   
   // TIFF header (little-endian)
-  segment[pos++] = 0x49; // 'I' - Intel byte order
-  segment[pos++] = 0x49; // 'I'
-  view.setUint16(pos, 0x002A, true); // TIFF magic
+  segment[pos++] = 0x49;
+  segment[pos++] = 0x49;
+  view.setUint16(pos, 0x002A, true);
   pos += 2;
-  view.setUint32(pos, ifd0Offset, true); // Offset to IFD0
+  view.setUint32(pos, ifd0Offset, true);
   pos += 4;
   
-  // IFD0
-  view.setUint16(pos, ifd0Entries, true); // Number of entries
+  // IFD0: pointer to EXIF IFD (tag 0x8769)
+  view.setUint16(pos, ifd0Entries, true);
   pos += 2;
-  
-  // IFD0 Entry: ExifIFDPointer (tag 0x8769)
-  view.setUint16(pos, 0x8769, true); // Tag
+  view.setUint16(pos, 0x8769, true);
   pos += 2;
-  view.setUint16(pos, 4, true); // Type: LONG
+  view.setUint16(pos, 4, true);
   pos += 2;
-  view.setUint32(pos, 1, true); // Count
+  view.setUint32(pos, 1, true);
   pos += 4;
-  view.setUint32(pos, exifIfdOffset, true); // Value: offset to EXIF IFD
+  view.setUint32(pos, exifIfdOffset, true);
   pos += 4;
-  
-  // Next IFD offset (0 = no more IFDs)
   view.setUint32(pos, 0, true);
   pos += 4;
   
-  // EXIF IFD
-  view.setUint16(pos, exifIfdEntries, true); // Number of entries
+  // EXIF IFD: DateTimeOriginal (0x9003), DateTimeDigitized (0x9004), DateTime (0x0132)
+  view.setUint16(pos, exifIfdEntries, true);
   pos += 2;
   
-  // Entry 1: DateTimeOriginal (tag 0x9003)
-  view.setUint16(pos, 0x9003, true); // Tag
+  // DateTimeOriginal
+  view.setUint16(pos, 0x9003, true);
   pos += 2;
-  view.setUint16(pos, 2, true); // Type: ASCII
+  view.setUint16(pos, 2, true);
   pos += 2;
-  view.setUint32(pos, dateTimeBytes.length, true); // Count
+  view.setUint32(pos, dateTimeBytes.length, true);
   pos += 4;
-  view.setUint32(pos, dateTimeDataOffset, true); // Offset to value
-  pos += 4;
-  
-  // Entry 2: DateTimeDigitized (tag 0x9004)
-  view.setUint16(pos, 0x9004, true); // Tag
-  pos += 2;
-  view.setUint16(pos, 2, true); // Type: ASCII
-  pos += 2;
-  view.setUint32(pos, dateTimeBytes.length, true); // Count
-  pos += 4;
-  view.setUint32(pos, dateTimeDataOffset + dateTimeBytes.length, true); // Offset
+  view.setUint32(pos, dateTimeDataOffset, true);
   pos += 4;
   
-  // Entry 3: DateTime (tag 0x0132) - main IFD0 tag, some apps use this
-  view.setUint16(pos, 0x0132, true); // Tag
+  // DateTimeDigitized
+  view.setUint16(pos, 0x9004, true);
   pos += 2;
-  view.setUint16(pos, 2, true); // Type: ASCII
+  view.setUint16(pos, 2, true);
   pos += 2;
-  view.setUint32(pos, dateTimeBytes.length, true); // Count
+  view.setUint32(pos, dateTimeBytes.length, true);
   pos += 4;
-  view.setUint32(pos, dateTimeDataOffset + dateTimeBytes.length * 2, true); // Offset
+  view.setUint32(pos, dateTimeDataOffset + dateTimeBytes.length, true);
   pos += 4;
   
-  // Next IFD offset (0 = no more)
+  // DateTime
+  view.setUint16(pos, 0x0132, true);
+  pos += 2;
+  view.setUint16(pos, 2, true);
+  pos += 2;
+  view.setUint32(pos, dateTimeBytes.length, true);
+  pos += 4;
+  view.setUint32(pos, dateTimeDataOffset + dateTimeBytes.length * 2, true);
+  pos += 4;
+  
   view.setUint32(pos, 0, true);
   pos += 4;
   
-  // DateTime values (3 copies for the 3 tags)
+  // DateTime values (3 copies)
   segment.set(dateTimeBytes, tiffStart + dateTimeDataOffset);
   segment.set(dateTimeBytes, tiffStart + dateTimeDataOffset + dateTimeBytes.length);
   segment.set(dateTimeBytes, tiffStart + dateTimeDataOffset + dateTimeBytes.length * 2);
@@ -297,13 +195,7 @@ function createMinimalExifSegment(): Uint8Array {
   return segment;
 }
 
-/**
- * Format a Date object to EXIF datetime format
- * Format: "YYYY:MM:DD HH:MM:SS"
- * 
- * @param date - Date object
- * @returns Formatted datetime string
- */
+/** Format Date to EXIF format: "YYYY:MM:DD HH:MM:SS" */
 function formatExifDateTime(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');

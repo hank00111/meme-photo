@@ -3,6 +3,8 @@ import '../styles/components.css'
 import ErrorBoundary from '../components/ErrorBoundary'
 import AuthOverlay from '../components/AuthOverlay'
 import UserAvatar from '../components/UserAvatar'
+import AlbumSelector from '../components/AlbumSelector'
+import AlbumSelectorModal from '../components/AlbumSelectorModal'
 import UploadHistory from '../components/UploadHistory'
 import { getUserProfile, clearUserProfile } from '../utils/userProfile'
 import { clearThumbnailCache } from '../utils/thumbnailCache'
@@ -16,6 +18,7 @@ function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isProfileLoading, setIsProfileLoading] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     const manifest = chrome.runtime.getManifest()
@@ -118,6 +121,14 @@ function App() {
     }
   }
 
+  const handleConfigureAlbum = () => {
+    setIsModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+  }
+
   return (
     <ErrorBoundary>
       <div className="app-container">
@@ -151,6 +162,9 @@ function App() {
         )}
       </header>
 
+      {/* Album Selector */}
+      <AlbumSelector onConfigureClick={handleConfigureAlbum} />
+
       {/* Content */}
       <main className="app-content">
         <UploadHistory />
@@ -161,6 +175,12 @@ function App() {
             <span className="version">v{version}</span>
             {/* <button className="btn-donate">Donate ❤️</button> */}
           </footer>
+
+          {/* Album Selector Modal */}
+          <AlbumSelectorModal 
+            isOpen={isModalOpen}
+            onClose={handleCloseModal}
+          />
         </>
       )}
       </div>

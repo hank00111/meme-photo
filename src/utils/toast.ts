@@ -45,12 +45,16 @@ export const ERROR_MESSAGES = {
   NETWORK_ERROR: 'Network connection failed. Please check your internet.',
   API_ERROR: 'Google Photos API is temporarily unavailable.',
   AUTH_FAILED: 'Authorization failed. Please sign in again.',
+  AUTH_TOKEN_EXPIRED: 'Session expired. Please sign in again.',
   STORAGE_READ_FAILED: 'Failed to read upload history.',
+  STORAGE_WRITE_ERROR: 'Failed to save settings. Please try again.',
   UPLOAD_FAILED: 'Upload failed. Please try again.',
   DELETE_FAILED: 'Failed to delete record.',
   INVALID_FILE_TYPE: 'Invalid file type. Supported: JPEG, PNG, GIF, BMP, TIFF, WebP, HEIC.',
   FILE_TOO_LARGE: 'File size exceeds 200MB limit.',
-  PROFILE_LOAD_FAILED: 'Failed to load user profile. Please try again.'
+  PROFILE_LOAD_FAILED: 'Failed to load user profile. Please try again.',
+  ALBUM_LOAD_FAILED: 'Failed to load albums. Please try again.',
+  ALBUM_CREATE_FAILED: 'Failed to create album. Please try again.'
 } as const;
 
 /**
