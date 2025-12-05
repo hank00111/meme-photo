@@ -12,7 +12,6 @@ import { showError } from '../utils/toast'
 import type { UserProfile } from '../types/storage'
 
 function App() {
-  const [isDevelopment, setIsDevelopment] = useState(false)
   const [version, setVersion] = useState('')
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [isAuthLoading, setIsAuthLoading] = useState(true)
@@ -22,7 +21,6 @@ function App() {
 
   useEffect(() => {
     const manifest = chrome.runtime.getManifest()
-    setIsDevelopment(!manifest.key)
     setVersion(manifest.version)
     checkAuthStatus()
   }, [])
@@ -141,26 +139,16 @@ function App() {
           <>
             {/* Header */}
             <header className="app-header">
-        <div className="header-content">
-          <UserAvatar 
-            userProfile={userProfile}
-            onRefresh={handleRefreshProfile}
-            isLoading={isProfileLoading}
-          />
-          <h1 className="app-title">Meme Photo</h1>
-        </div>
-        {isDevelopment && (
-          <div className="dev-section">
-            <button 
-              className="btn-test-auth"
-              onClick={handleLogout}
-              style={{ backgroundColor: '#ff9800' }}
-            >
-              Logout
-            </button>
-          </div>
-        )}
-      </header>
+              <div className="header-content">
+                <h1 className="app-title">Meme Photo</h1>
+                <UserAvatar 
+                  userProfile={userProfile}
+                  onRefresh={handleRefreshProfile}
+                  isLoading={isProfileLoading}
+                  onLogout={handleLogout}
+                />
+              </div>
+            </header>
 
       {/* Album Selector */}
       <AlbumSelector onConfigureClick={handleConfigureAlbum} />

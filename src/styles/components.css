@@ -841,3 +841,66 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ===== USER AVATAR WRAPPER (Phase 7.7) ===== */
+.user-avatar-wrapper {
+  position: relative;
+  cursor: pointer;
+}
+
+.user-avatar-wrapper .user-avatar,
+.user-avatar-wrapper .avatar-placeholder {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Hover effect only triggers when directly hovering over the avatar */
+.user-avatar:hover,
+.avatar-placeholder:hover {
+  transform: scale(1.08);
+  box-shadow:
+    0 0 8px 6px rgba(90, 159, 77, 1);
+}
+
+/* ===== USER MENU DROPDOWN (Phase 7.7) ===== */
+.user-menu {
+  position: absolute;
+  top: calc(100% );
+  right: 0;
+  min-width: 100px;
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-bg-footer);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  opacity: 0;
+  transform: translateY(-6px);
+  animation: menuFadeIn 0.2s ease forwards;
+  overflow: hidden;
+}
+
+@keyframes menuFadeIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.user-menu-item {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: none;
+  border: none;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.user-menu-item:hover {
+  background-color: var(--color-bg-secondary);
+}
+
+.user-menu-item:active {
+  background-color: var(--color-bg-tertiary);
+}
