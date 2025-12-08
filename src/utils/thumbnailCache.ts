@@ -11,7 +11,6 @@
 
 import type { ThumbnailCache, ThumbnailCacheEntry } from '../types/storage';
 
-/** Maximum number of cached thumbnails. Oldest accessed entries are evicted first. */
 const MAX_CACHE_SIZE = 100;
 
 async function getCachedThumbnail(mediaItemId: string): Promise<string | null> {
@@ -83,7 +82,6 @@ async function cacheThumbnail(
   }
 }
 
-/** Clears all cached thumbnails. Call on logout. */
 export async function clearThumbnailCache(): Promise<void> {
   try {
     await chrome.storage.local.remove('thumbnailCache');
@@ -100,7 +98,6 @@ async function fetchThumbnailFromApi(
   try {
     console.log('THUMBNAIL_CACHE: Fetching from API for mediaItemId:', mediaItemId);
 
-    // Step 1: Get media item info to get baseUrl
     const response = await fetch(
       `https://photoslibrary.googleapis.com/v1/mediaItems/${mediaItemId}`,
       {
@@ -126,7 +123,6 @@ async function fetchThumbnailFromApi(
       return null;
     }
 
-    // Step 2: Fetch the actual image with size parameter
     const thumbnailUrl = `${mediaItem.baseUrl}=s48`;
     const imageResponse = await fetch(thumbnailUrl);
     
@@ -135,7 +131,6 @@ async function fetchThumbnailFromApi(
       return null;
     }
 
-    // Step 3: Convert to Base64 Data URL
     const blob = await imageResponse.blob();
     const base64DataUrl = await blobToDataUrl(blob);
     
@@ -163,24 +158,20 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-/** Gets thumbnail as Base64 Data URL. Checks cache first, fetches from API if not cached. */
 export async function getThumbnailDataUrl(
   mediaItemId: string,
   token: string
 ): Promise<string | null> {
-  // Step 1: Check cache first
   const cached = await getCachedThumbnail(mediaItemId);
   if (cached) {
     return cached;
   }
 
-  // Step 2: Fetch from API
   const dataUrl = await fetchThumbnailFromApi(mediaItemId, token);
   if (!dataUrl) {
     return null;
   }
 
-  // Step 3: Cache for future use
   await cacheThumbnail(mediaItemId, dataUrl);
 
   return dataUrl;

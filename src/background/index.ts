@@ -39,7 +39,6 @@ chrome.runtime.onStartup.addListener(() => {
   console.log("INFO: Extension started");
 });
 
-// NOTE: tab parameter is optional - may be undefined in some contexts
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   console.log("MENU_CLICK: Context menu clicked");
   console.log("MENU_CLICK: Menu item ID:", info.menuItemId);
@@ -126,21 +125,18 @@ async function showToastInTab(
 
     console.log(`TOAST_INJECT: Injecting toast into tab ${tabId}`);
 
-    // Step 1: Inject CSS (only once per tab)
     await chrome.scripting.insertCSS({
       target: { tabId },
       files: ["styles/toast-content-script.css"],
     });
     console.log("TOAST_INJECT: CSS injected successfully");
 
-    // Step 2: Inject toast script
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ["content/toast-injector.js"],
     });
     console.log("TOAST_INJECT: Script injected successfully");
 
-    // Step 3: Send message to show toast
     await chrome.tabs.sendMessage(tabId, {
       action: "showToast",
       type: type,
@@ -216,7 +212,35 @@ async function handleImageUpload(
 
     // Read selected album ID from storage (Phase 7.4)
     const storageResult = await chrome.storage.sync.get('selectedAlbumId');
-    const albumId = (storageResult.selectedAlbumId as string | undefined) || null;
+    let albumId = (storageResult.selectedAlbumId as string | undefined) || null;
+
+    // Validate albumId: ensure it's an app-created album
+    // Since March 2025 API changes, only app-created albums are allowed
+    if (albumId) {
+      try {
+        const { getOrCreateMemePhotoAlbum } = await import('../utils/albumCache');
+        const memePhotoAlbum = await getOrCreateMemePhotoAlbum(token);
+        
+        // If stored albumId doesn't match app-created album, migrate to it
+        if (albumId !== memePhotoAlbum.id) {
+          console.log('UPLOAD: Invalid album ID detected, migrating to meme-photo album', {
+            oldAlbumId: albumId,
+            newAlbumId: memePhotoAlbum.id,
+          });
+          
+          albumId = memePhotoAlbum.id;
+          
+          // Update storage to prevent future errors
+          await chrome.storage.sync.set({ selectedAlbumId: memePhotoAlbum.id });
+        }
+      } catch (error) {
+        console.error('UPLOAD: Failed to validate album ID, falling back to Main Library', error);
+        albumId = null; // Fallback to Main Library on validation error
+        
+        // Clear invalid albumId from storage
+        await chrome.storage.sync.remove('selectedAlbumId');
+      }
+    }
 
     console.log('UPLOAD: Using album destination', {
       albumId: albumId || 'Main Library',

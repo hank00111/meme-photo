@@ -1,14 +1,9 @@
-/**
- * Upload History Utility
- * Manages upload records in chrome.storage.local with 50-record limit.
- */
+/** Upload history management with 50-record limit. */
 
 import type { UploadRecord } from '../types/storage';
 
-/** Maximum records to keep. Older records are auto-removed. */
 const MAX_RECORDS = 50;
 
-/** Get all upload records from storage (newest first). */
 export async function getUploadHistory(): Promise<UploadRecord[]> {
   try {
     const result = await chrome.storage.local.get('uploadHistory');
@@ -19,7 +14,6 @@ export async function getUploadHistory(): Promise<UploadRecord[]> {
   }
 }
 
-/** Add a new upload record. Auto-generates UUID and timestamp, enforces 50-record limit. */
 export async function addUploadRecord(
   record: Omit<UploadRecord, 'id' | 'timestamp'>
 ): Promise<void> {
@@ -52,7 +46,6 @@ export async function addUploadRecord(
   }
 }
 
-/** Delete an upload record by ID. Returns true if deleted, false if not found. */
 export async function deleteUploadRecord(id: string): Promise<boolean> {
   try {
     const result = await chrome.storage.local.get('uploadHistory');
@@ -79,5 +72,14 @@ export async function deleteUploadRecord(id: string): Promise<boolean> {
   } catch (error) {
     console.error('HISTORY: Failed to delete upload record:', error);
     return false;
+  }
+}
+
+export async function clearUploadHistory(): Promise<void> {
+  try {
+    await chrome.storage.local.remove('uploadHistory');
+    console.log('HISTORY: All upload history cleared');
+  } catch (error) {
+    console.error('HISTORY: Failed to clear upload history:', error);
   }
 }

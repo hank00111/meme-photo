@@ -1,45 +1,11 @@
-/**
- * Toast Notification System - Phase 3.8
- * 
- * Simple DOM-based toast notifications with auto-dismiss.
- * No external dependencies, uses pure CSS transitions.
- * 
- * Features:
- * - Maximum visible toasts limit (prevents stacking overflow)
- * - Duplicate message prevention (same message won't show twice)
- * - Cleanup function to remove all toasts and pending timers
- * 
- * @example
- * ```typescript
- * import { showToast, ERROR_MESSAGES, cleanupToasts } from '../utils/toast';
- * 
- * showToast(ERROR_MESSAGES.NETWORK_ERROR, 'error');
- * showToast('Upload successful!', 'success');
- * 
- * // Cleanup when component unmounts
- * cleanupToasts();
- * ```
- */
+/** Toast notification system with auto-dismiss and duplicate prevention. */
 
-/**
- * Maximum number of visible toasts at once
- * Based on Sonner library best practice (default: 3)
- */
 const MAX_VISIBLE_TOASTS = 3;
 
-/**
- * Track active toast timers for cleanup
- */
 const activeTimers: Set<ReturnType<typeof setTimeout>> = new Set();
 
-/**
- * Toast notification types
- */
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
-/**
- * Predefined error messages (English-first, prepared for i18n)
- */
 export const ERROR_MESSAGES = {
   THUMBNAIL_LOAD_FAILED: 'Failed to load thumbnail. Please try again.',
   NETWORK_ERROR: 'Network connection failed. Please check your internet.',
@@ -57,13 +23,6 @@ export const ERROR_MESSAGES = {
   ALBUM_CREATE_FAILED: 'Failed to create album. Please try again.'
 } as const;
 
-/**
- * Cleanup all toasts and pending timers
- * 
- * Call this when the component unmounts or on page unload to prevent:
- * - Memory leaks from orphaned timers
- * - State updates on unmounted components
- */
 export function cleanupToasts(): void {
   // Clear all pending timers
   for (const timer of activeTimers) {
@@ -78,13 +37,6 @@ export function cleanupToasts(): void {
   }
 }
 
-/**
- * Show a toast notification
- * 
- * @param message - Message to display
- * @param type - Toast type (success/error/info/warning)
- * @param duration - Auto-dismiss duration in milliseconds (default: 3000)
- */
 export function showToast(
   message: string, 
   type: ToastType = 'info', 
@@ -161,20 +113,10 @@ export function showToast(
   activeTimers.add(dismissTimer);
 }
 
-/**
- * Show error toast with predefined message
- * 
- * @param errorKey - Key from ERROR_MESSAGES
- */
 export function showError(errorKey: keyof typeof ERROR_MESSAGES): void {
   showToast(ERROR_MESSAGES[errorKey], 'error');
 }
 
-/**
- * Show success toast
- * 
- * @param message - Success message
- */
 export function showSuccess(message: string): void {
   showToast(message, 'success');
 }

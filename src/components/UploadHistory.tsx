@@ -2,38 +2,14 @@ import { useState, useEffect } from 'react';
 import UploadRecordCard from './UploadRecordCard';
 import { getUploadHistory, deleteUploadRecord } from '../utils/uploadHistory';
 import { showSuccess, showError } from '../utils/toast';
+import { cleanupThumbnailErrorAggregator } from '../utils/thumbnailErrorAggregator';
 import type { UploadRecord } from '../types/storage';
 
-/**
- * UploadHistory Component
- * 
- * Displays the 10 most recent upload records from chrome.storage.local.
- * Shared component used by both Popup and Sidepanel for consistent UX.
- * 
- * Features:
- * - Fetches upload history from chrome.storage.local on mount
- * - Displays 10 most recent records in vertical layout
- * - Real-time sync via chrome.storage.onChanged listener
- * - Empty state when no records exist
- * - Loading state during initial fetch
- * - Delete functionality with UI refresh
- * 
- * Storage Sync:
- * - When Popup deletes a record, Sidepanel automatically updates
- * - When Sidepanel deletes a record, Popup automatically updates
- * - Ensures both UIs always display the same data
- * 
- * @example
- * // In popup/App.tsx or sidepanel/App.tsx
- * <div className="app-content">
- *   <UploadHistory />
- * </div>
- */
+/** Displays 10 most recent uploads with real-time sync across popup/sidepanel. */
 export default function UploadHistory() {
   const [records, setRecords] = useState<UploadRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initial data fetch on component mount
   useEffect(() => {
     async function fetchRecords() {
       try {
@@ -50,8 +26,6 @@ export default function UploadHistory() {
     fetchRecords();
   }, []);
 
-  // Real-time storage sync listener
-  // Ensures Popup and Sidepanel stay in sync
   useEffect(() => {
     const handleStorageChange = (
       changes: { [key: string]: chrome.storage.StorageChange },
@@ -67,20 +41,13 @@ export default function UploadHistory() {
 
     chrome.storage.onChanged.addListener(handleStorageChange);
 
-    // Cleanup listener on unmount
+    // Cleanup listener and thumbnail error aggregator on unmount
     return () => {
       chrome.storage.onChanged.removeListener(handleStorageChange);
+      cleanupThumbnailErrorAggregator();
     };
   }, []);
 
-  /**
-   * Handle delete button click from UploadRecordCard
-   * 
-   * Optimized: No need to call getUploadHistory() after delete.
-   * The storage.onChanged listener will automatically sync the UI.
-   * 
-   * @param id - UUID of the record to delete
-   */
   const handleDelete = async (id: string) => {
     try {
       const success = await deleteUploadRecord(id);
@@ -104,13 +71,10 @@ export default function UploadHistory() {
     return <div className="loading-state">Loading...</div>;
   }
 
-  // Empty state
-  // TODO: Implement i18n for localization (English/Chinese)
   if (records.length === 0) {
     return <div className="empty-state">No upload history yet</div>;
   }
 
-  // Loaded state: Display 10 most recent records
   const recentRecords = records.slice(0, 10);
 
   return (

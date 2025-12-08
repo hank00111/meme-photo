@@ -1,16 +1,4 @@
-/**
- * ErrorBoundary Component - Phase 3.8
- * 
- * React Error Boundary to catch rendering errors and display fallback UI.
- * Implements error logging and retry mechanism.
- * 
- * @example
- * ```tsx
- * <ErrorBoundary>
- *   <App />
- * </ErrorBoundary>
- * ```
- */
+/** React Error Boundary with fallback UI and retry mechanism. */
 
 import { Component } from 'react';
 import type { ReactNode } from 'react';
@@ -34,9 +22,6 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     };
   }
 
-  /**
-   * Update state when an error is caught
-   */
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return {
       hasError: true,
@@ -44,17 +29,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     };
   }
 
-  /**
-   * Log error details to console
-   */
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     console.error('ERROR_BOUNDARY: Component error caught:', error);
     console.error('ERROR_BOUNDARY: Error info:', errorInfo);
   }
 
-  /**
-   * Reset error state and retry rendering
-   */
   handleReset = (): void => {
     this.setState({
       hasError: false,

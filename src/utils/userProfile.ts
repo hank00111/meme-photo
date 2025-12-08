@@ -1,21 +1,8 @@
-/**
- * User Profile Utility
- * 
- * Handles fetching and caching user profile information from Google UserInfo endpoint.
- * Uses OpenID Connect standard userinfo.profile scope.
- * 
- * API Reference: https://developers.google.com/identity/protocols/oauth2/openid-connect
- * Endpoint: https://www.googleapis.com/oauth2/v3/userinfo
- */
+/** User profile fetching and caching with 7-day TTL. API: https://developers.google.com/identity/protocols/oauth2/openid-connect */
 
 import type { UserProfile, StorageSchema } from '../types/storage';
 
-/**
- * UserInfo API Response Interface
- * 
- * Standard OpenID Connect UserInfo response structure.
- * Documentation: https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
- */
+/** OpenID Connect UserInfo response. */
 interface UserInfoResponse {
   /** Subject identifier (unique user ID) */
   sub: string;
@@ -49,34 +36,12 @@ const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
  */
 const USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v3/userinfo';
 
-/**
- * Fetches user profile information from Google UserInfo endpoint
- * 
- * This function retrieves the user's name and profile photo URL using the
- * OpenID Connect UserInfo endpoint. It implements caching to avoid unnecessary
- * API calls - cached data is valid for 7 days.
- * 
- * @param token - OAuth 2.0 access token from chrome.identity.getAuthToken()
- * @param forceRefresh - If true, bypasses cache and fetches fresh data
- * @returns UserProfile object with name and photoUrl, or null if fetch fails
- * 
- * @example
- * ```typescript
- * const token = await chrome.identity.getAuthToken({ interactive: false });
- * if (token) {
- *   const profile = await getUserProfile(token);
- *   if (profile) {
- *     console.log(`User: ${profile.name}`);
- *   }
- * }
- * ```
- */
+/** Fetches user profile from Google UserInfo endpoint. Uses 7-day cache unless forceRefresh=true. */
 export async function getUserProfile(
   token: string,
   forceRefresh = false
 ): Promise<UserProfile | null> {
   try {
-    // Check cache first (unless force refresh)
     if (!forceRefresh) {
       const cached = await getCachedProfile();
       if (cached) {
@@ -85,7 +50,6 @@ export async function getUserProfile(
       }
     }
 
-    // Fetch from UserInfo API
     console.log('USER_PROFILE: Fetching profile from UserInfo endpoint');
     const response = await fetch(USERINFO_ENDPOINT, {
       method: 'GET',
@@ -104,20 +68,17 @@ export async function getUserProfile(
 
     const data: UserInfoResponse = await response.json();
 
-    // Validate required fields
     if (!data.name || !data.picture) {
       console.error('USER_PROFILE: Missing required fields in response', data);
       return null;
     }
 
-    // Create UserProfile object
     const profile: UserProfile = {
       name: data.name,
       photoUrl: data.picture,
       lastUpdated: Date.now(),
     };
 
-    // Cache the profile
     await cacheProfile(profile);
     console.log('USER_PROFILE: Profile fetched and cached successfully');
 
@@ -142,7 +103,6 @@ async function getCachedProfile(): Promise<UserProfile | null> {
       return null;
     }
 
-    // Check if cache is still valid
     const age = Date.now() - cached.lastUpdated;
     if (age > CACHE_EXPIRY_MS) {
       console.log('USER_PROFILE: Cache expired, will fetch fresh data');
@@ -169,17 +129,7 @@ async function cacheProfile(profile: UserProfile): Promise<void> {
   }
 }
 
-/**
- * Clears cached user profile from chrome.storage.local
- * 
- * This should be called when the user logs out or when you want to
- * force a refresh of the profile data.
- * 
- * @example
- * ```typescript
- * await clearUserProfile();
- * ```
- */
+/** Clears cached user profile. Call on logout. */
 export async function clearUserProfile(): Promise<void> {
   try {
     await chrome.storage.local.remove('userProfile');

@@ -1,25 +1,8 @@
-/**
- * Album Cache Utility
- * 
- * Manages album name caching and Google Photos Albums API integration.
- * Implements 7-day cache expiration to minimize API calls while maintaining data freshness.
- * 
- * API Reference: https://developers.google.com/photos/library/reference/rest/v1/albums
- */
+/** Album caching with 7-day TTL. API: https://developers.google.com/photos/library/reference/rest/v1/albums */
 
 import type { AlbumCache } from '../types/storage';
 
-/**
- * Album Interface
- * 
- * Represents a Google Photos album from the Albums API.
- * 
- * @property id - Permanent album identifier
- * @property title - Album title (max 500 characters)
- * @property productUrl - Google Photos web URL for viewing the album
- * @property isWriteable - Whether media items can be created in this album
- * @property mediaItemsCount - Number of media items in the album (optional)
- */
+/** Google Photos album from Albums API. */
 export interface Album {
   id: string;
   title: string;
@@ -28,11 +11,7 @@ export interface Album {
   mediaItemsCount?: number;
 }
 
-/**
- * Albums API List Response
- * 
- * Internal interface for albums.list API response.
- */
+/** Albums API list response. */
 interface AlbumsListResponse {
   albums?: Array<{
     id: string;
@@ -44,42 +23,19 @@ interface AlbumsListResponse {
   nextPageToken?: string;
 }
 
-/**
- * Cache expiration time: 7 days in milliseconds
- * 
- * Album names are relatively stable, so we cache them for 7 days
- * to minimize API calls while ensuring data freshness.
- */
-const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+/** Cache expiration: 7 days */
+const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * Google Photos API base URL
- */
 const API_BASE = 'https://photoslibrary.googleapis.com/v1';
 
-/**
- * Fixed album name for meme-photo uploads
- * 
- * All users will use this consistent album name for brand identity.
- * This album is automatically created on first use.
- */
+/** Fixed album name for meme-photo uploads. Auto-created on first use. */
 export const MEME_PHOTO_ALBUM_NAME = 'meme-photo';
 
 // ============================================================================
 // Cache Management Functions
 // ============================================================================
 
-/**
- * Saves a single album title to cache with current timestamp
- * 
- * @param albumId - Album identifier
- * @param title - Album title to cache
- * 
- * @example
- * ```typescript
- * await cacheAlbumTitle('album-123', 'My Vacation Photos');
- * ```
- */
+/** Saves album title to cache with current timestamp. */
 export async function cacheAlbumTitle(
   albumId: string,
   title: string
@@ -108,22 +64,7 @@ export async function cacheAlbumTitle(
   }
 }
 
-/**
- * Retrieves album title from cache
- * 
- * Returns null if album is not cached or cache has expired (>7 days).
- * 
- * @param albumId - Album identifier
- * @returns Album title if cached and valid, null otherwise
- * 
- * @example
- * ```typescript
- * const title = await getAlbumTitle('album-123');
- * if (title) {
- *   console.log(`Album: ${title}`);
- * }
- * ```
- */
+/** Retrieves album title from cache. Returns null if not cached or expired (>7 days). */
 export async function getAlbumTitle(albumId: string): Promise<string | null> {
   try {
     const result = await chrome.storage.local.get('albumCache');
@@ -148,20 +89,7 @@ export async function getAlbumTitle(albumId: string): Promise<string | null> {
   }
 }
 
-/**
- * Batch cache multiple albums at once
- * 
- * More efficient than calling cacheAlbumTitle() multiple times,
- * as it performs a single storage write operation.
- * 
- * @param albums - Array of Album objects from listAlbums()
- * 
- * @example
- * ```typescript
- * const albums = await listAlbums(token);
- * await batchCacheAlbums(albums);
- * ```
- */
+/** Batch cache multiple albums with single storage write. */
 export async function batchCacheAlbums(albums: Album[]): Promise<void> {
   try {
     // Read current cache
@@ -189,17 +117,7 @@ export async function batchCacheAlbums(albums: Album[]): Promise<void> {
   }
 }
 
-/**
- * Removes expired cache entries (older than 7 days)
- * 
- * Should be called periodically (e.g., on extension startup) to
- * prevent cache from growing indefinitely.
- * 
- * @example
- * ```typescript
- * await cleanupExpiredCache();
- * ```
- */
+/** Removes expired cache entries (older than 7 days). */
 export async function cleanupExpiredCache(): Promise<void> {
   try {
     const result = await chrome.storage.local.get('albumCache');
@@ -231,16 +149,7 @@ export async function cleanupExpiredCache(): Promise<void> {
   }
 }
 
-/**
- * Clears all album cache from storage
- * 
- * Should be called when user logs out to ensure privacy.
- * 
- * @example
- * ```typescript
- * await clearAlbumCache();
- * ```
- */
+/** Clears all album cache. Call on logout for privacy. */
 export async function clearAlbumCache(): Promise<void> {
   try {
     await chrome.storage.local.remove('albumCache');
@@ -254,29 +163,7 @@ export async function clearAlbumCache(): Promise<void> {
 // Google Photos Albums API Functions
 // ============================================================================
 
-/**
- * Lists albums created by this application
- * 
- * Fetches up to 50 albums using pagination (pageSize=20).
- * Only returns albums created by this extension.
- * 
- * API Endpoint: GET /v1/albums
- * Documentation: https://developers.google.com/photos/library/reference/rest/v1/albums/list
- * 
- * @param token - OAuth 2.0 access token from chrome.identity.getAuthToken()
- * @returns Array of Album objects (max 50), or empty array on error
- * 
- * @throws Error on API failures (401, 403, 429, 500)
- * 
- * @example
- * ```typescript
- * const result = await chrome.identity.getAuthToken({ interactive: false });
- * if (result.token) {
- *   const albums = await listAlbums(result.token);
- *   console.log(`Found ${albums.length} albums`);
- * }
- * ```
- */
+/** Lists albums created by this app (max 50, paginated). */
 export async function listAlbums(token: string): Promise<Album[]> {
   try {
     const albums: Album[] = [];
@@ -362,29 +249,7 @@ export async function listAlbums(token: string): Promise<Album[]> {
   }
 }
 
-/**
- * Creates a new album in Google Photos
- * 
- * Creates an album with the specified title and returns the created album object.
- * 
- * API Endpoint: POST /v1/albums
- * Documentation: https://developers.google.com/photos/library/reference/rest/v1/albums/create
- * 
- * @param token - OAuth 2.0 access token from chrome.identity.getAuthToken()
- * @param title - Album title (max 500 characters, cannot be empty)
- * @returns Created Album object
- * 
- * @throws Error if title is invalid or API request fails
- * 
- * @example
- * ```typescript
- * const result = await chrome.identity.getAuthToken({ interactive: false });
- * if (result.token) {
- *   const album = await createAlbum(result.token, 'My New Album');
- *   console.log(`Created album: ${album.id}`);
- * }
- * ```
- */
+/** Creates new album in Google Photos. */
 export async function createAlbum(
   token: string,
   title: string
@@ -461,27 +326,7 @@ export async function createAlbum(
   }
 }
 
-/**
- * Gets or creates the fixed 'meme-photo' album
- * 
- * Searches for an existing album named "meme-photo" and returns it.
- * If not found, creates a new album with this name.
- * This ensures all users have a consistent default album.
- * 
- * @param token - OAuth 2.0 access token from chrome.identity.getAuthToken()
- * @returns The meme-photo Album object
- * 
- * @throws Error if API request fails or token is expired
- * 
- * @example
- * ```typescript
- * const tokenResult = await chrome.identity.getAuthToken({ interactive: false });
- * if (tokenResult?.token) {
- *   const album = await getOrCreateMemePhotoAlbum(tokenResult.token);
- *   console.log(`Using album: ${album.id}`);
- * }
- * ```
- */
+/** Gets or creates the 'meme-photo' album. */
 export async function getOrCreateMemePhotoAlbum(token: string): Promise<Album> {
   try {
     console.log('ALBUM_CACHE: Searching for meme-photo album');

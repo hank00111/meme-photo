@@ -8,6 +8,8 @@ import AlbumSelectorModal from '../components/AlbumSelectorModal'
 import UploadHistory from '../components/UploadHistory'
 import { getUserProfile, clearUserProfile } from '../utils/userProfile'
 import { clearThumbnailCache } from '../utils/thumbnailCache'
+import { clearAlbumCache } from '../utils/albumCache'
+import { clearUploadHistory } from '../utils/uploadHistory'
 import { showError } from '../utils/toast'
 import type { UserProfile } from '../types/storage'
 
@@ -102,6 +104,12 @@ function App() {
       await clearUserProfile()
       await clearThumbnailCache()
       console.log('AUTH: Thumbnail cache cleared')
+      await clearAlbumCache()
+      console.log('AUTH: Album cache cleared')
+      await clearUploadHistory()
+      console.log('AUTH: Upload history cleared')
+      await chrome.storage.sync.remove('selectedAlbumId')
+      console.log('AUTH: Selected album ID cleared')
       await chrome.storage.local.set({ isManuallyLoggedOut: true })
       setUserProfile(null)
       setIsAuthorized(false)
@@ -137,8 +145,6 @@ function App() {
           />
         ) : (
           <>
-            {/* Header */}
-            {/* Header */}
             <header className="app-header">
               <div className="header-content">
                 <h1 className="app-title">Meme Photo</h1>
@@ -151,21 +157,17 @@ function App() {
               </div>
             </header>
 
-          {/* Album Selector */}
           <AlbumSelector onConfigureClick={handleConfigureAlbum} />
 
-          {/* Content */}
           <main className="app-content">
             <UploadHistory />
           </main>
 
-          {/* Footer */}
           <footer className="app-footer">
             <span className="version">v{version}</span>
             {/* <button className="btn-donate">Donate ❤️</button> */}
           </footer>
 
-          {/* Album Selector Modal */}
           <AlbumSelectorModal 
             isOpen={isModalOpen}
             onClose={handleCloseModal}

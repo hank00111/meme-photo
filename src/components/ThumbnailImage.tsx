@@ -1,24 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getThumbnailDataUrl } from '../utils/thumbnailCache';
-import { showError } from '../utils/toast';
+import { reportThumbnailError } from '../utils/thumbnailErrorAggregator';
 
-/**
- * ThumbnailImage Component
- * 
- * Displays thumbnail images for upload records with proper loading and error states.
- * Uses local caching to avoid repeated API calls (Base64 Data URLs stored in chrome.storage.local).
- * 
- * Features:
- * - Skeleton loading state with shimmer animation
- * - 48x48px thumbnail display
- * - Error fallback with icon + filename
- * - Automatic OAuth token management
- * - Local thumbnail caching via getThumbnailDataUrl()
- * - No network requests for cached thumbnails
- * 
- * @param mediaItemId - Google Photos media item ID from UploadRecord
- * @param filename - Original filename for error fallback display
- */
+/** Displays thumbnail with loading state and error fallback. Uses local caching to avoid repeated API calls. */
 interface ThumbnailImageProps {
   mediaItemId: string;
   filename: string;
@@ -32,36 +16,23 @@ export default function ThumbnailImage({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
-  /**
-   * Fetch thumbnail on component mount (with local caching)
-   * 
-   * Process:
-   * 1. Get OAuth token from chrome.identity
-   * 2. Call getThumbnailDataUrl() which:
-   *    - First checks local cache (chrome.storage.local)
-   *    - If cached, returns Base64 Data URL immediately (no network request)
-   *    - If not cached, fetches from API and caches for future use
-   * 3. Handle errors gracefully (show fallback)
-   */
   useEffect(() => {
     let isMounted = true;
 
     const fetchThumbnail = async () => {
       try {
-        // Step 1: Get OAuth token (non-interactive - should already be authorized)
         const result = await chrome.identity.getAuthToken({ interactive: false });
         
         if (!isMounted) return;
 
         if (chrome.runtime.lastError || !result?.token) {
           console.error('THUMBNAIL: Failed to get auth token:', chrome.runtime.lastError);
-          showError('THUMBNAIL_LOAD_FAILED');
+          reportThumbnailError();
           setHasError(true);
           setIsLoading(false);
           return;
         }
 
-        // Step 2: Get thumbnail (from cache or API)
         const dataUrl = await getThumbnailDataUrl(mediaItemId, result.token);
 
         if (!isMounted) return;
@@ -71,7 +42,7 @@ export default function ThumbnailImage({
           setIsLoading(false);
         } else {
           console.error('THUMBNAIL: getThumbnailDataUrl returned null for mediaItemId:', mediaItemId);
-          showError('THUMBNAIL_LOAD_FAILED');
+          reportThumbnailError();
           setHasError(true);
           setIsLoading(false);
         }
@@ -80,7 +51,7 @@ export default function ThumbnailImage({
         if (!isMounted) return;
         
         console.error('THUMBNAIL: Unexpected error fetching thumbnail:', error);
-        showError('THUMBNAIL_LOAD_FAILED');
+        reportThumbnailError();
         setHasError(true);
         setIsLoading(false);
       }
@@ -94,26 +65,16 @@ export default function ThumbnailImage({
     };
   }, [mediaItemId]);
 
-  /**
-   * Handle image load error
-   * 
-   * Triggers when:
-   * - Image URL is invalid
-   * - Network error while loading image
-   * - CORS issues (shouldn't happen with Google Photos CDN)
-   */
   const handleImageError = () => {
     console.error('THUMBNAIL: Image failed to load for mediaItemId:', mediaItemId);
-    showError('THUMBNAIL_LOAD_FAILED');
+    reportThumbnailError();
     setHasError(true);
   };
 
-  // Loading state: Show skeleton with shimmer animation
   if (isLoading) {
     return <div className="thumbnail-skeleton" />;
   }
 
-  // Error state: Show fallback with icon + filename
   if (hasError || !thumbnailUrl) {
     return (
       <div className="thumbnail-error">
@@ -129,7 +90,6 @@ export default function ThumbnailImage({
     );
   }
 
-  // Success state: Show thumbnail image
   return (
     <img 
       src={thumbnailUrl} 
