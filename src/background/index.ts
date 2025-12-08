@@ -4,16 +4,23 @@ import { stripExifMetadata } from "../utils/imageProcessor";
 // Upload queue using Promise chain pattern to prevent concurrent write errors
 let uploadQueue: Promise<void> = Promise.resolve();
 
-console.log("INFO: Meme Photo extension loaded");
+const tabsWithInjectedCSS = new Set<number>();
 
-chrome.runtime.onInstalled.addListener((details) => {
-  console.log("INFO: Extension installed:", details.reason);
+chrome.tabs.onRemoved.addListener((tabId) => {
+  tabsWithInjectedCSS.delete(tabId);
+});
 
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === "loading") {
+    tabsWithInjectedCSS.delete(tabId);
+  }
+});
+
+chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.set({
     installedAt: new Date().toISOString(),
   });
 
-  // Remove existing menus to prevent duplicates on extension reload
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create(
       {
@@ -27,41 +34,25 @@ chrome.runtime.onInstalled.addListener((details) => {
             "MENU_ERROR: Failed to create context menu:",
             chrome.runtime.lastError
           );
-        } else {
-          console.log("MENU: Context menu created successfully");
         }
       }
     );
   });
 });
 
-chrome.runtime.onStartup.addListener(() => {
-  console.log("INFO: Extension started");
-});
+chrome.runtime.onStartup.addListener(() => {});
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  console.log("MENU_CLICK: Context menu clicked");
-  console.log("MENU_CLICK: Menu item ID:", info.menuItemId);
-
   if (info.menuItemId === "upload-to-google-photos" && info.srcUrl) {
-    console.log("MENU_CLICK: Image URL:", info.srcUrl);
-    console.log("MENU_CLICK: Page URL:", info.pageUrl);
-    console.log("MENU_CLICK: Tab ID:", tab?.id);
-
-    // Capture values before async chain to preserve type narrowing
     const imageUrl = info.srcUrl;
     const pageUrl = info.pageUrl;
 
-    // Chain upload to queue instead of executing immediately
     uploadQueue = uploadQueue
       .then(async () => {
-        console.log("QUEUE: Processing upload from queue");
         await handleImageUpload(imageUrl, pageUrl, tab);
-        console.log("UPLOAD_SUCCESS: Image uploaded successfully");
       })
       .catch(async (error) => {
         console.error("QUEUE_ERROR: Upload failed in queue:", error);
-        // Show error toast in web page if tab is available
         if (tab?.id) {
           try {
             await showToastInTab(
@@ -75,15 +66,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
               toastError
             );
           }
-        } else {
-          console.log("TOAST_SKIP: No tab ID available for error toast");
         }
       })
-      .finally(() => {
-        console.log("QUEUE: Upload completed, queue ready for next");
-      });
-
-    console.log("QUEUE: Upload added to queue");
+      .finally(() => {});
   }
 });
 
@@ -93,19 +78,19 @@ type ToastType = "success" | "error" | "info" | "warning" | "loading";
 /** Check if URL is a restricted page where content scripts cannot be injected */
 function isRestrictedUrl(url: string | undefined): boolean {
   if (!url) return true;
-  
+
   const restrictedPrefixes = [
-    'chrome://',
-    'chrome-extension://',
-    'edge://',
-    'about:',
-    'moz-extension://',
-    'file://',
-    'data:',
-    'blob:'
+    "chrome://",
+    "chrome-extension://",
+    "edge://",
+    "about:",
+    "moz-extension://",
+    "file://",
+    "data:",
+    "blob:",
   ];
-  
-  return restrictedPrefixes.some(prefix => url.startsWith(prefix));
+
+  return restrictedPrefixes.some((prefix) => url.startsWith(prefix));
 }
 
 /** Inject toast CSS/JS into tab and display message */
@@ -116,26 +101,23 @@ async function showToastInTab(
   toastId?: string
 ): Promise<void> {
   try {
-    // Check if we can inject into this tab
     const tab = await chrome.tabs.get(tabId);
     if (isRestrictedUrl(tab.url)) {
-      console.log(`TOAST_SKIP: Cannot inject into restricted page: ${tab.url}`);
       return;
     }
 
-    console.log(`TOAST_INJECT: Injecting toast into tab ${tabId}`);
-
-    await chrome.scripting.insertCSS({
-      target: { tabId },
-      files: ["styles/toast-content-script.css"],
-    });
-    console.log("TOAST_INJECT: CSS injected successfully");
+    if (!tabsWithInjectedCSS.has(tabId)) {
+      await chrome.scripting.insertCSS({
+        target: { tabId },
+        files: ["styles/toast-content-script.css"],
+      });
+      tabsWithInjectedCSS.add(tabId);
+    }
 
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ["content/toast-injector.js"],
     });
-    console.log("TOAST_INJECT: Script injected successfully");
 
     await chrome.tabs.sendMessage(tabId, {
       action: "showToast",
@@ -143,24 +125,23 @@ async function showToastInTab(
       message: message,
       toastId: toastId,
     });
-    console.log(`TOAST_INJECT: Toast message sent (${type})`);
   } catch (error) {
     console.error("TOAST_INJECT_ERROR: Failed to inject toast:", error);
     // Don't throw - toast injection failure shouldn't break the upload flow
   }
 }
 
-async function dismissToastInTab(tabId: number, toastId: string): Promise<void> {
+async function dismissToastInTab(
+  tabId: number,
+  toastId: string
+): Promise<void> {
   try {
-    // Send dismiss message to content script
     await chrome.tabs.sendMessage(tabId, {
       action: "dismissToast",
       toastId: toastId,
     });
-    console.log(`TOAST_DISMISS: Toast dismissed (${toastId})`);
-  } catch (error) {
+  } catch {
     // Tab may have navigated away or been closed - this is expected
-    console.log("TOAST_DISMISS: Could not dismiss toast (tab may have navigated):", error);
   }
 }
 
@@ -169,18 +150,14 @@ async function handleImageUpload(
   _pageUrl?: string,
   tab?: chrome.tabs.Tab
 ) {
-  console.log("UPLOAD: Starting upload process...");
-
   // Keep Service Worker alive during long upload operations
   // Service Worker can terminate after 30 seconds of inactivity
   const keepAliveInterval = setInterval(() => {
     chrome.runtime.getPlatformInfo();
   }, 25 * 1000);
 
-  // Generate unique toast ID for this upload
   const uploadToastId = `upload-${Date.now()}`;
 
-  // Show loading toast if tab is available
   if (tab?.id) {
     try {
       await showToastInTab(
@@ -211,42 +188,43 @@ async function handleImageUpload(
     const uploadToken = await uploadImageBytes(processedBlob, token);
 
     // Read selected album ID from storage (Phase 7.4)
-    const storageResult = await chrome.storage.sync.get('selectedAlbumId');
+    const storageResult = await chrome.storage.sync.get("selectedAlbumId");
     let albumId = (storageResult.selectedAlbumId as string | undefined) || null;
 
     // Validate albumId: ensure it's an app-created album
     // Since March 2025 API changes, only app-created albums are allowed
     if (albumId) {
       try {
-        const { getOrCreateMemePhotoAlbum } = await import('../utils/albumCache');
+        const { getOrCreateMemePhotoAlbum } = await import(
+          "../utils/albumCache"
+        );
         const memePhotoAlbum = await getOrCreateMemePhotoAlbum(token);
-        
+
         // If stored albumId doesn't match app-created album, migrate to it
         if (albumId !== memePhotoAlbum.id) {
-          console.log('UPLOAD: Invalid album ID detected, migrating to meme-photo album', {
-            oldAlbumId: albumId,
-            newAlbumId: memePhotoAlbum.id,
-          });
-          
           albumId = memePhotoAlbum.id;
-          
+
           // Update storage to prevent future errors
           await chrome.storage.sync.set({ selectedAlbumId: memePhotoAlbum.id });
         }
       } catch (error) {
-        console.error('UPLOAD: Failed to validate album ID, falling back to Main Library', error);
+        console.error(
+          "UPLOAD: Failed to validate album ID, falling back to Main Library",
+          error
+        );
         albumId = null; // Fallback to Main Library on validation error
-        
+
         // Clear invalid albumId from storage
-        await chrome.storage.sync.remove('selectedAlbumId');
+        await chrome.storage.sync.remove("selectedAlbumId");
       }
     }
 
-    console.log('UPLOAD: Using album destination', {
-      albumId: albumId || 'Main Library',
-    });
-
-    const mediaItem = await createMediaItem(uploadToken, filename, token, albumId || undefined);
+    const mediaItem = await createMediaItem(
+      uploadToken,
+      filename,
+      token,
+      albumId || undefined
+    );
 
     try {
       await addUploadRecord({
@@ -254,7 +232,6 @@ async function handleImageUpload(
         mediaItemId: mediaItem.id,
         productUrl: mediaItem.productUrl,
       });
-      console.log("HISTORY: Upload record saved successfully");
     } catch (error) {
       console.error("HISTORY_ERROR: Failed to save upload record:", error);
     }
@@ -264,7 +241,7 @@ async function handleImageUpload(
       try {
         // Dismiss the loading toast first
         await dismissToastInTab(tab.id, uploadToastId);
-        
+
         // Show success toast
         await showToastInTab(
           tab.id,
@@ -275,13 +252,9 @@ async function handleImageUpload(
         console.error("TOAST_ERROR: Failed to show toast notification:", error);
         // Continue execution - toast failure shouldn't break the upload flow
       }
-    } else {
-      console.log("TOAST_SKIP: No tab ID available, skipping web toast");
     }
 
     // Web toast is already shown in Step 4.6
-    console.log("UPLOAD_SUCCESS: Media item created -", mediaItem.id);
-    console.log("UPLOAD_SUCCESS: Product URL -", mediaItem.productUrl);
   } catch (error) {
     // Dismiss loading toast and show error instead
     if (tab?.id) {
@@ -296,20 +269,19 @@ async function handleImageUpload(
   } finally {
     // Always clean up keep-alive interval
     clearInterval(keepAliveInterval);
-    console.log("UPLOAD: Keep-alive interval cleared");
   }
 }
 
 async function downloadImage(
   imageUrl: string
 ): Promise<{ blob: Blob; filename: string }> {
-  console.log("DOWNLOAD: Fetching image from:", imageUrl);
-
   // Validate URL protocol (only allow HTTP/HTTPS)
   try {
     const url = new URL(imageUrl);
     if (!["http:", "https:"].includes(url.protocol)) {
-      throw new Error(`Unsupported protocol: ${url.protocol}. Only HTTP/HTTPS URLs are supported.`);
+      throw new Error(
+        `Unsupported protocol: ${url.protocol}. Only HTTP/HTTPS URLs are supported.`
+      );
     }
   } catch (error) {
     if (error instanceof TypeError) {
@@ -330,7 +302,9 @@ async function downloadImage(
       );
     }
     throw new Error(
-      `Failed to download image: ${error instanceof Error ? error.message : "Unknown error"}`
+      `Failed to download image: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
     );
   }
 
@@ -342,12 +316,6 @@ async function downloadImage(
     }
 
     const blob = await response.blob();
-    console.log(
-      "DOWNLOAD: Image downloaded, size:",
-      blob.size,
-      "bytes, type:",
-      blob.type
-    );
 
     // Validate file size (200MB hard limit, 50MB recommended for best performance)
     const MAX_FILE_SIZE = 200 * 1024 * 1024;
@@ -368,7 +336,20 @@ async function downloadImage(
       "image/x-icon",
     ];
     if (!validTypes.includes(blob.type)) {
-      throw new Error(`Unsupported image format: ${blob.type}`);
+      // BUG-002 Mitigation: Provide user-friendly error messages
+      if (!blob.type) {
+        // Empty Content-Type from server - inform user about the issue
+        console.warn("DOWNLOAD: Server returned empty Content-Type header");
+        throw new Error(
+          "Unable to determine image format. The image server may have incorrect configuration. " +
+            "Try saving the image to your device first, then upload to Google Photos manually."
+        );
+      }
+      // Unsupported format - list supported formats for clarity
+      throw new Error(
+        `Unsupported image format: ${blob.type}. ` +
+          "Supported formats: JPEG, PNG, GIF, BMP, TIFF, WebP, HEIC, AVIF."
+      );
     }
 
     const filename = extractFilename(imageUrl) || generateFilename(blob.type);
@@ -418,33 +399,32 @@ function generateFilename(mimeType: string): string {
   return `meme-photo-${timestamp}.${ext}`;
 }
 
-/** Validate OAuth token by calling userinfo endpoint */
+/**
+ * Validate OAuth token by calling tokeninfo endpoint.
+ * Uses query parameter per Google OAuth2 documentation:
+ * https://developers.google.com/identity/protocols/oauth2/openid-connect#validatinganidtoken
+ */
 async function validateToken(token: string): Promise<boolean> {
   try {
-    const response = await fetch('https://www.googleapis.com/oauth2/v3/tokeninfo', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
+    // Use query parameter (official standard) instead of Authorization header
+    const response = await fetch(
+      `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${encodeURIComponent(token)}`
+    );
+
     if (!response.ok) {
-      console.log('AUTH: Token validation failed:', response.status);
       return false;
     }
-    
+
     const data = await response.json();
     // Check if token expires within 5 minutes
     const expiresIn = parseInt(data.expires_in, 10);
     if (isNaN(expiresIn) || expiresIn < 300) {
-      console.log('AUTH: Token expires soon or invalid expires_in:', data.expires_in);
       return false;
     }
-    
-    console.log('AUTH: Token validated, expires in', expiresIn, 'seconds');
+
     return true;
   } catch (error) {
-    console.error('AUTH: Token validation error:', error);
+    console.error("AUTH: Token validation error:", error);
     return false;
   }
 }
@@ -462,23 +442,21 @@ async function getAuthToken(): Promise<string | null> {
     // Validate token before returning
     const isValid = await validateToken(result.token);
     if (!isValid) {
-      console.log('AUTH: Token invalid or expired, removing from cache');
       await chrome.identity.removeCachedAuthToken({ token: result.token });
-      
+
       // Try to get a new token interactively
-      console.log('AUTH: Attempting interactive token refresh');
-      const newResult = await chrome.identity.getAuthToken({ interactive: true });
-      
+      const newResult = await chrome.identity.getAuthToken({
+        interactive: true,
+      });
+
       if (!newResult.token) {
-        console.warn('AUTH_WARNING: Interactive token request failed');
+        console.warn("AUTH_WARNING: Interactive token request failed");
         return null;
       }
-      
-      console.log('AUTH: New token obtained via interactive flow');
+
       return newResult.token;
     }
 
-    console.log("AUTH: Retrieved and validated cached token");
     return result.token;
   } catch (error) {
     console.error("AUTH_ERROR: Failed to get auth token:", error);
@@ -487,8 +465,6 @@ async function getAuthToken(): Promise<string | null> {
 }
 
 async function uploadImageBytes(blob: Blob, token: string): Promise<string> {
-  console.log("API_UPLOAD: Uploading bytes...");
-
   const response = await fetch(
     "https://photoslibrary.googleapis.com/v1/uploads",
     {
@@ -509,7 +485,6 @@ async function uploadImageBytes(blob: Blob, token: string): Promise<string> {
   }
 
   const uploadToken = await response.text();
-  console.log("API_UPLOAD: Got upload token");
 
   return uploadToken;
 }
@@ -528,11 +503,6 @@ async function createMediaItem(
   token: string,
   albumId?: string
 ): Promise<GooglePhotosMediaItem> {
-  console.log("API_CREATE: Creating media item...", {
-    filename,
-    albumId: albumId || 'Main Library',
-  });
-
   const response = await fetch(
     "https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate",
     {
@@ -571,8 +541,6 @@ async function createMediaItem(
   if (itemResult.status?.code) {
     throw new Error(`Media item creation failed: ${itemResult.status.message}`);
   }
-
-  console.log("API_CREATE: Media item created successfully");
 
   return itemResult.mediaItem;
 }

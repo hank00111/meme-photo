@@ -8,13 +8,11 @@ interface AlbumSelectorModalProps {
 }
 
 export default function AlbumSelectorModal({ isOpen, onClose }: AlbumSelectorModalProps) {
-  // State management
   const [memePhotoAlbum, setMemePhotoAlbum] = useState<Album | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load meme-photo album on mount
   useEffect(() => {
     if (!isOpen) return;
 
@@ -24,11 +22,9 @@ export default function AlbumSelectorModal({ isOpen, onClose }: AlbumSelectorMod
       setIsLoading(true);
 
       try {
-        // 1. Load current selection from storage
         const result = await chrome.storage.sync.get('selectedAlbumId');
         let currentSelection = (result.selectedAlbumId as string | undefined) || null;
 
-        // 2. Get or create meme-photo album
         const tokenResult = await chrome.identity.getAuthToken({ interactive: false });
         if (!tokenResult?.token) {
           throw new Error('AUTH_TOKEN_MISSING');
@@ -36,31 +32,18 @@ export default function AlbumSelectorModal({ isOpen, onClose }: AlbumSelectorMod
 
         const album = await getOrCreateMemePhotoAlbum(tokenResult.token);
 
-        // 3. Backward compatibility: migrate old selectedAlbumId to meme-photo
         if (currentSelection && currentSelection !== album.id) {
-          console.log('ALBUM_MODAL: Migrating old album selection to meme-photo', {
-            oldAlbumId: currentSelection,
-            newAlbumId: album.id,
-          });
           currentSelection = album.id;
           await chrome.storage.sync.set({ selectedAlbumId: album.id });
         }
 
-        if (!ignore) { // Only update state if not unmounted
+        if (!ignore) {
           setMemePhotoAlbum(album);
           setSelectedId(currentSelection);
-
-          // 4. Cache album title for faster future access
           await cacheAlbumTitle(album.id, album.title);
-
-          console.log('ALBUM_MODAL: meme-photo album loaded', {
-            id: album.id,
-            mediaItemsCount: album.mediaItemsCount,
-            currentSelection,
-          });
         }
       } catch (error) {
-        if (!ignore) { // Only show error if not unmounted
+        if (!ignore) {
           console.error('ALBUM_MODAL: Failed to load meme-photo album', error);
           
           const errorMessage = error instanceof Error && error.message === 'AUTH_TOKEN_EXPIRED'
@@ -70,7 +53,7 @@ export default function AlbumSelectorModal({ isOpen, onClose }: AlbumSelectorMod
           showToast(errorMessage, 'error');
         }
       } finally {
-        if (!ignore) { // Only update loading state if not unmounted
+        if (!ignore) {
           setIsLoading(false);
         }
       }
@@ -83,15 +66,11 @@ export default function AlbumSelectorModal({ isOpen, onClose }: AlbumSelectorMod
     };
   }, [isOpen]);
 
-  // Handle save selection
   const handleSave = async () => {
     setIsSaving(true);
 
     try {
-      // Save selection to chrome.storage.sync
       await chrome.storage.sync.set({ selectedAlbumId: selectedId });
-
-      console.log('ALBUM_MODAL: Selection saved', { selectedAlbumId: selectedId });
 
       showToast(
         selectedId 
@@ -109,7 +88,6 @@ export default function AlbumSelectorModal({ isOpen, onClose }: AlbumSelectorMod
     }
   };
 
-  // Handle cancel
   const handleCancel = () => {
     onClose();
   };

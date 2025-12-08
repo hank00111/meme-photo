@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { showError } from '../utils/toast';
 import type { UserProfile } from '../types/storage';
 
+/** Maximum number of refresh retries to prevent infinite loop */
+const MAX_REFRESH_RETRIES = 2;
+
 /** Displays user avatar with dropdown menu. Shows placeholder during loading or on error. */
 interface UserAvatarProps {
   userProfile: UserProfile | null;
@@ -18,13 +21,21 @@ export default function UserAvatar({
 }: UserAvatarProps) {
   const [imageError, setImageError] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [refreshRetryCount, setRefreshRetryCount] = useState(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const handleImageError = () => {
     console.error('AVATAR: Photo URL failed to load');
-    showError('PROFILE_LOAD_FAILED');
     setImageError(true);
-    onRefresh?.();
+    
+    // Prevent infinite loop: only retry up to MAX_REFRESH_RETRIES times
+    if (refreshRetryCount < MAX_REFRESH_RETRIES) {
+      setRefreshRetryCount(prev => prev + 1);
+      showError('PROFILE_LOAD_FAILED');
+      onRefresh?.();
+    } else {
+      console.warn('AVATAR: Max refresh retries reached, stopping auto-refresh');
+    }
   };
 
   const handleAvatarClick = () => {
@@ -39,8 +50,10 @@ export default function UserAvatar({
   };
 
   useEffect(() => {
-    if (imageError && userProfile?.photoUrl) {
+    // Reset error state and retry count when photoUrl changes successfully
+    if (userProfile?.photoUrl && imageError) {
       setImageError(false);
+      setRefreshRetryCount(0);
     }
   }, [userProfile?.photoUrl, imageError]);
 
@@ -77,7 +90,8 @@ export default function UserAvatar({
   }, [isMenuOpen]);
 
   // Determine if we should show placeholder
-  const showPlaceholder = isLoading || !userProfile || imageError;
+  // Also show placeholder when photoUrl is empty (user has no profile picture)
+  const showPlaceholder = isLoading || !userProfile || imageError || !userProfile.photoUrl;
 
   return (
     <div 

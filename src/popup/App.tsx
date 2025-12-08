@@ -53,7 +53,7 @@ function App() {
 
   const checkAuthStatus = async () => {
     try {
-      // Check if user manually logged out
+
       const { isManuallyLoggedOut } = await chrome.storage.local.get('isManuallyLoggedOut')
       if (isManuallyLoggedOut) {
         setIsAuthorized(false)
@@ -65,8 +65,8 @@ function App() {
       if (result.token) {
         setIsAuthorized(true)
       }
-    } catch (error) {
-      console.log('Not authorized yet:', error)
+    } catch {
+      // Silent failure - user not authorized yet
     } finally {
       setIsAuthLoading(false)
     }
@@ -75,7 +75,6 @@ function App() {
   const handleAuthorize = async () => {
     setIsAuthLoading(true)
     try {
-      // Clear manual logout flag
       await chrome.storage.local.remove('isManuallyLoggedOut')
       
       const result = await chrome.identity.getAuthToken({ interactive: true })
@@ -94,23 +93,22 @@ function App() {
     try {
       const result = await chrome.identity.getAuthToken({ interactive: false })
       if (result.token) {
-        await fetch(`https://oauth2.googleapis.com/revoke?token=${result.token}`, {
+        const revokeResponse = await fetch(`https://oauth2.googleapis.com/revoke?token=${result.token}`, {
           method: 'POST'
         })
-        console.log('AUTH: OAuth access revoked from Google Account')
+        if (revokeResponse.ok) {
+          // Token revoked successfully
+        } else {
+          console.warn('AUTH: Token revocation may have failed:', revokeResponse.status)
+        }
       }
-      await chrome.identity.clearAllCachedAuthTokens()
-      console.log('AUTH: All cached tokens cleared')
-      await clearUserProfile()
-      await clearThumbnailCache()
-      console.log('AUTH: Thumbnail cache cleared')
-      await clearAlbumCache()
-      console.log('AUTH: Album cache cleared')
-      await clearUploadHistory()
-      console.log('AUTH: Upload history cleared')
-      await chrome.storage.sync.remove('selectedAlbumId')
-      console.log('AUTH: Selected album ID cleared')
-      await chrome.storage.local.set({ isManuallyLoggedOut: true })
+      await chrome.identity.clearAllCachedAuthTokens();
+      await clearUserProfile();
+      await clearThumbnailCache();
+      await clearAlbumCache();
+      await clearUploadHistory();
+      await chrome.storage.sync.remove('selectedAlbumId');
+      await chrome.storage.local.set({ isManuallyLoggedOut: true });
       setUserProfile(null)
       setIsAuthorized(false)
       setIsAuthLoading(false)

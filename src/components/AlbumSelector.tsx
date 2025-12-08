@@ -65,7 +65,6 @@ export default function AlbumSelector({ onConfigureClick }: AlbumSelectorProps) 
     ) => {
       if (areaName === 'sync' && changes.selectedAlbumId) {
         const newAlbumId = changes.selectedAlbumId.newValue as string | undefined;
-        console.log('ALBUM_SELECTOR: selectedAlbumId changed:', newAlbumId);
         setSelectedAlbumId(newAlbumId || null);
       }
     };

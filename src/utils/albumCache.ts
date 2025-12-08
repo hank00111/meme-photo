@@ -41,23 +41,16 @@ export async function cacheAlbumTitle(
   title: string
 ): Promise<void> {
   try {
-    // Read current cache
     const result = await chrome.storage.local.get('albumCache');
     const albumCache = (result.albumCache ?? {}) as AlbumCache;
 
-    // Update cache with new entry
     albumCache[albumId] = {
       name: title,
       lastUpdated: Date.now(),
     };
 
-    // Save back to storage
     await chrome.storage.local.set({ albumCache });
 
-    console.log('ALBUM_CACHE: Album title cached', {
-      albumId,
-      title,
-    });
   } catch (error) {
     console.error('ALBUM_CACHE: Failed to cache album title', error);
     throw error;
@@ -75,10 +68,8 @@ export async function getAlbumTitle(albumId: string): Promise<string | null> {
       return null;
     }
 
-    // Check if cache is still valid
     const age = Date.now() - cached.lastUpdated;
     if (age > CACHE_EXPIRY_MS) {
-      console.log('ALBUM_CACHE: Cache expired for album', albumId);
       return null;
     }
 
@@ -92,11 +83,9 @@ export async function getAlbumTitle(albumId: string): Promise<string | null> {
 /** Batch cache multiple albums with single storage write. */
 export async function batchCacheAlbums(albums: Album[]): Promise<void> {
   try {
-    // Read current cache
     const result = await chrome.storage.local.get('albumCache');
     const albumCache = (result.albumCache ?? {}) as AlbumCache;
 
-    // Update cache with all albums
     const now = Date.now();
     albums.forEach((album) => {
       albumCache[album.id] = {
@@ -105,12 +94,8 @@ export async function batchCacheAlbums(albums: Album[]): Promise<void> {
       };
     });
 
-    // Single write operation
     await chrome.storage.local.set({ albumCache });
 
-    console.log('ALBUM_CACHE: Batch cached albums', {
-      count: albums.length,
-    });
   } catch (error) {
     console.error('ALBUM_CACHE: Failed to batch cache albums', error);
     throw error;
@@ -124,26 +109,17 @@ export async function cleanupExpiredCache(): Promise<void> {
     const albumCache = (result.albumCache ?? {}) as AlbumCache;
 
     const now = Date.now();
-    let removedCount = 0;
 
-    // Filter out expired entries
     const cleaned: AlbumCache = {};
     Object.entries(albumCache).forEach(([albumId, cached]) => {
       const age = now - cached.lastUpdated;
       if (age <= CACHE_EXPIRY_MS) {
         cleaned[albumId] = cached;
-      } else {
-        removedCount++;
       }
     });
 
-    // Save cleaned cache
     await chrome.storage.local.set({ albumCache: cleaned });
 
-    console.log('ALBUM_CACHE: Cleanup completed', {
-      removedCount,
-      remainingCount: Object.keys(cleaned).length,
-    });
   } catch (error) {
     console.error('ALBUM_CACHE: Failed to cleanup cache', error);
   }
@@ -153,7 +129,6 @@ export async function cleanupExpiredCache(): Promise<void> {
 export async function clearAlbumCache(): Promise<void> {
   try {
     await chrome.storage.local.remove('albumCache');
-    console.log('ALBUM_CACHE: Cache cleared');
   } catch (error) {
     console.error('ALBUM_CACHE: Failed to clear cache', error);
   }
@@ -170,8 +145,6 @@ export async function listAlbums(token: string): Promise<Album[]> {
     let pageToken: string | undefined;
     const pageSize = 20; // Max 50 allowed, but we use 20 for efficiency
     const maxAlbums = 50; // Hard limit
-
-    console.log('ALBUM_CACHE: Fetching albums from API');
 
     while (albums.length < maxAlbums) {
       // Build URL with query parameters
@@ -238,10 +211,6 @@ export async function listAlbums(token: string): Promise<Album[]> {
     // Limit to max 50 albums
     const result = albums.slice(0, maxAlbums);
 
-    console.log('ALBUM_CACHE: Albums fetched successfully', {
-      count: result.length,
-    });
-
     return result;
   } catch (error) {
     console.error('ALBUM_CACHE: Failed to list albums', error);
@@ -263,8 +232,6 @@ export async function createAlbum(
     if (trimmedTitle.length > 500) {
       throw new Error('ALBUM_TITLE_TOO_LONG');
     }
-
-    console.log('ALBUM_CACHE: Creating album', { title: trimmedTitle });
 
     // Create album via API
     const response = await fetch(`${API_BASE}/albums`, {
@@ -314,11 +281,6 @@ export async function createAlbum(
         : 0, // New albums start with 0 items
     };
 
-    console.log('ALBUM_CACHE: Album created successfully', {
-      id: album.id,
-      title: album.title,
-    });
-
     return album;
   } catch (error) {
     console.error('ALBUM_CACHE: Failed to create album', error);
@@ -329,27 +291,16 @@ export async function createAlbum(
 /** Gets or creates the 'meme-photo' album. */
 export async function getOrCreateMemePhotoAlbum(token: string): Promise<Album> {
   try {
-    console.log('ALBUM_CACHE: Searching for meme-photo album');
-    
     // Search for existing meme-photo album
     const albums = await listAlbums(token);
     const existing = albums.find(album => album.title === MEME_PHOTO_ALBUM_NAME);
     
     if (existing) {
-      console.log('ALBUM_CACHE: Found existing meme-photo album', {
-        id: existing.id,
-        mediaItemsCount: existing.mediaItemsCount,
-      });
       return existing;
     }
     
     // Create if not found
-    console.log('ALBUM_CACHE: Creating new meme-photo album');
     const newAlbum = await createAlbum(token, MEME_PHOTO_ALBUM_NAME);
-    
-    console.log('ALBUM_CACHE: meme-photo album created successfully', {
-      id: newAlbum.id,
-    });
     
     return newAlbum;
   } catch (error) {

@@ -75,7 +75,6 @@
 
   // src/content/toast-injector.ts
   if (window.__memePhotoToastInitialized) {
-    console.log("[Meme Photo] Toast injector already initialized, skipping duplicate registration");
   } else {
     window.__memePhotoToastInitialized = true;
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -102,6 +101,5 @@
       }
       return false;
     });
-    console.log("[Meme Photo] Toast injector initialized successfully");
   }
 })();

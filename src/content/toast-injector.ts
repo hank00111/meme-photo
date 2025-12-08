@@ -39,7 +39,6 @@ declare global {
  */
 if (window.__memePhotoToastInitialized) {
   // Already initialized, skip listener registration
-  console.log('[Meme Photo] Toast injector already initialized, skipping duplicate registration');
 } else {
   // Mark as initialized
   window.__memePhotoToastInitialized = true;
@@ -84,6 +83,4 @@ if (window.__memePhotoToastInitialized) {
     // Unknown action
     return false;
   });
-  
-  console.log('[Meme Photo] Toast injector initialized successfully');
 }

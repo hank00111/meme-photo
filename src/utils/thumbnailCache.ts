@@ -20,16 +20,12 @@ async function getCachedThumbnail(mediaItemId: string): Promise<string | null> {
     
     const entry = cache[mediaItemId];
     if (entry?.base64DataUrl) {
-      console.log('THUMBNAIL_CACHE: Cache hit for mediaItemId:', mediaItemId);
-      
-      // Update lastAccessedAt for LRU tracking
       entry.lastAccessedAt = Date.now();
       await chrome.storage.local.set({ thumbnailCache: cache });
       
       return entry.base64DataUrl;
     }
     
-    console.log('THUMBNAIL_CACHE: Cache miss for mediaItemId:', mediaItemId);
     return null;
   } catch (error) {
     console.error('THUMBNAIL_CACHE: Error reading cache:', error);
@@ -45,7 +41,6 @@ async function cacheThumbnail(
     const result = await chrome.storage.local.get('thumbnailCache');
     const cache = (result.thumbnailCache ?? {}) as ThumbnailCache;
     
-    // Evict oldest entries if cache is at capacity
     const entries = Object.entries(cache);
     if (entries.length >= MAX_CACHE_SIZE) {
       // Sort by lastAccessedAt (or cachedAt as fallback), oldest first
@@ -62,8 +57,6 @@ async function cacheThumbnail(
       for (const [key] of entriesToRemove) {
         delete cache[key];
       }
-      
-      console.log(`THUMBNAIL_CACHE: Evicted ${entriesToRemove.length} oldest entries (LRU)`);
     }
     
     const now = Date.now();
@@ -76,7 +69,6 @@ async function cacheThumbnail(
     cache[mediaItemId] = entry;
     
     await chrome.storage.local.set({ thumbnailCache: cache });
-    console.log('THUMBNAIL_CACHE: Cached thumbnail for mediaItemId:', mediaItemId);
   } catch (error) {
     console.error('THUMBNAIL_CACHE: Error saving to cache:', error);
   }
@@ -85,7 +77,6 @@ async function cacheThumbnail(
 export async function clearThumbnailCache(): Promise<void> {
   try {
     await chrome.storage.local.remove('thumbnailCache');
-    console.log('THUMBNAIL_CACHE: All cached thumbnails cleared');
   } catch (error) {
     console.error('THUMBNAIL_CACHE: Error clearing cache:', error);
   }
@@ -96,8 +87,6 @@ async function fetchThumbnailFromApi(
   token: string
 ): Promise<string | null> {
   try {
-    console.log('THUMBNAIL_CACHE: Fetching from API for mediaItemId:', mediaItemId);
-
     const response = await fetch(
       `https://photoslibrary.googleapis.com/v1/mediaItems/${mediaItemId}`,
       {
@@ -134,7 +123,6 @@ async function fetchThumbnailFromApi(
     const blob = await imageResponse.blob();
     const base64DataUrl = await blobToDataUrl(blob);
     
-    console.log('THUMBNAIL_CACHE: Successfully fetched and converted to Base64');
     return base64DataUrl;
 
   } catch (error) {
@@ -183,8 +171,6 @@ export async function getThumbnailUrl(
   token: string
 ): Promise<string | null> {
   try {
-    console.log('THUMBNAIL: Fetching thumbnail URL for mediaItemId:', mediaItemId);
-
     const response = await fetch(
       `https://photoslibrary.googleapis.com/v1/mediaItems/${mediaItemId}`,
       {
@@ -211,7 +197,6 @@ export async function getThumbnailUrl(
     }
 
     const thumbnailUrl = `${mediaItem.baseUrl}=s48`;
-    console.log('THUMBNAIL: Successfully fetched thumbnail URL');
 
     return thumbnailUrl;
 

@@ -31,17 +31,14 @@ export default function UploadHistory() {
       changes: { [key: string]: chrome.storage.StorageChange },
       areaName: string
     ) => {
-      // Only update if uploadHistory changed in local storage
       if (areaName === 'local' && changes.uploadHistory) {
         const newValue = changes.uploadHistory.newValue as UploadRecord[] | undefined;
         setRecords(newValue ?? []);
-        console.log('HISTORY: Storage updated, UI synced');
       }
     };
 
     chrome.storage.onChanged.addListener(handleStorageChange);
 
-    // Cleanup listener and thumbnail error aggregator on unmount
     return () => {
       chrome.storage.onChanged.removeListener(handleStorageChange);
       cleanupThumbnailErrorAggregator();
