@@ -1,4 +1,4 @@
-/** Album caching with 7-day TTL. API: https://developers.google.com/photos/library/reference/rest/v1/albums */
+/** Album cache (7-day TTL) */
 
 import type { AlbumCache } from '../types/storage';
 
@@ -31,11 +31,6 @@ const API_BASE = 'https://photoslibrary.googleapis.com/v1';
 /** Fixed album name for meme-photo uploads. Auto-created on first use. */
 export const MEME_PHOTO_ALBUM_NAME = 'meme-photo';
 
-// ============================================================================
-// Cache Management Functions
-// ============================================================================
-
-/** Saves album title to cache with current timestamp. */
 export async function cacheAlbumTitle(
   albumId: string,
   title: string
@@ -57,7 +52,7 @@ export async function cacheAlbumTitle(
   }
 }
 
-/** Retrieves album title from cache. Returns null if not cached or expired (>7 days). */
+/** Get album title from cache (null if expired) */
 export async function getAlbumTitle(albumId: string): Promise<string | null> {
   try {
     const result = await chrome.storage.local.get('albumCache');
@@ -80,7 +75,6 @@ export async function getAlbumTitle(albumId: string): Promise<string | null> {
   }
 }
 
-/** Batch cache multiple albums with single storage write. */
 export async function batchCacheAlbums(albums: Album[]): Promise<void> {
   try {
     const result = await chrome.storage.local.get('albumCache');
@@ -102,7 +96,6 @@ export async function batchCacheAlbums(albums: Album[]): Promise<void> {
   }
 }
 
-/** Removes expired cache entries (older than 7 days). */
 export async function cleanupExpiredCache(): Promise<void> {
   try {
     const result = await chrome.storage.local.get('albumCache');
@@ -125,7 +118,6 @@ export async function cleanupExpiredCache(): Promise<void> {
   }
 }
 
-/** Clears all album cache. Call on logout for privacy. */
 export async function clearAlbumCache(): Promise<void> {
   try {
     await chrome.storage.local.remove('albumCache');
@@ -134,11 +126,7 @@ export async function clearAlbumCache(): Promise<void> {
   }
 }
 
-// ============================================================================
-// Google Photos Albums API Functions
-// ============================================================================
-
-/** Lists albums created by this app (max 50, paginated). */
+/** List albums created by this app (max 50) */
 export async function listAlbums(token: string): Promise<Album[]> {
   try {
     const albums: Album[] = [];

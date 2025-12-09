@@ -1,14 +1,6 @@
-/**
- * Storage Type Definitions for Meme Photo Extension
- * 
- * This file defines TypeScript interfaces for chrome.storage data structures.
- * All storage operations should reference these interfaces for type safety.
- * 
- * - StorageSchema: chrome.storage.local (device-specific, max 10 MB)
- * - SyncStorageSchema: chrome.storage.sync (synced across devices, max 100 KB)
- */
+/** Chrome storage type definitions for local and sync storage schemas */
 
-/** Upload record for Google Photos. thumbnailUrl not stored (baseUrl expires). */
+/** Upload record for Google Photos */
 export interface UploadRecord {
   id: string;
   timestamp: number;
@@ -20,14 +12,12 @@ export interface UploadRecord {
   albumId?: string;
 }
 
-/** User's Google account info from userinfo.profile scope. */
 export interface UserProfile {
   name: string;
   photoUrl: string;
   lastUpdated: number;
 }
 
-/** Cached album names. Expires after 7 days. */
 export interface AlbumCache {
   [albumId: string]: {
     name: string;
@@ -35,7 +25,6 @@ export interface AlbumCache {
   };
 }
 
-/** Cached thumbnail as Base64 Data URL. */
 export interface ThumbnailCacheEntry {
   base64DataUrl: string;
   cachedAt: number;
@@ -43,17 +32,10 @@ export interface ThumbnailCacheEntry {
   lastAccessedAt?: number;
 }
 
-/** Thumbnail cache map. Key: mediaItemId, Value: ThumbnailCacheEntry */
 export interface ThumbnailCache {
   [mediaItemId: string]: ThumbnailCacheEntry;
 }
 
-/** 
- * Complete structure of chrome.storage.local data. Max 10 MB.
- * 
- * Device-specific storage that is NOT synced across devices.
- * Most data is cleared on logout for privacy.
- */
 export interface StorageSchema {
   /** Upload history records (max 50, auto-pruned). Cleared on logout. */
   uploadHistory: UploadRecord[];
@@ -69,12 +51,6 @@ export interface StorageSchema {
   isManuallyLoggedOut?: boolean;
 }
 
-/**
- * Complete structure of chrome.storage.sync data. Max 100 KB.
- * 
- * Synced across all devices where user is logged in with same Chrome profile.
- * Cleared on logout for privacy.
- */
 export interface SyncStorageSchema {
   /** Selected album ID for uploads. Cleared on logout. */
   selectedAlbumId?: string;

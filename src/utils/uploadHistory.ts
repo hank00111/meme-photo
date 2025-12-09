@@ -33,7 +33,7 @@ export async function addUploadRecord(
 
   } catch (error) {
     console.error('HISTORY: Failed to add upload record:', error);
-    throw error; // Re-throw to allow caller to handle
+    throw error;
   }
 }
 

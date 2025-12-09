@@ -24,13 +24,11 @@ export const ERROR_MESSAGES = {
 } as const;
 
 export function cleanupToasts(): void {
-  // Clear all pending timers
   for (const timer of activeTimers) {
     clearTimeout(timer);
   }
   activeTimers.clear();
   
-  // Remove toast container and all toasts
   const container = document.getElementById('toast-container');
   if (container) {
     container.remove();
@@ -42,7 +40,6 @@ export function showToast(
   type: ToastType = 'info', 
   duration: number = 3000
 ): void {
-  // Create toast container if it doesn't exist
   let container = document.getElementById('toast-container');
   if (!container) {
     container = document.createElement('div');
@@ -50,7 +47,6 @@ export function showToast(
     document.body.appendChild(container);
   }
 
-  // Duplicate message prevention: skip if same message already exists
   const existingToasts = container.querySelectorAll('.toast');
   for (const existing of existingToasts) {
     if (existing.getAttribute('data-message') === message) {
@@ -59,7 +55,6 @@ export function showToast(
     }
   }
 
-  // Remove oldest toasts if exceeding limit
   while (container.children.length >= MAX_VISIBLE_TOASTS) {
     const oldest = container.firstChild;
     if (oldest) {
@@ -67,34 +62,28 @@ export function showToast(
     }
   }
 
-  // Create toast element
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
   toast.setAttribute('role', 'alert');
   toast.setAttribute('aria-live', 'polite');
-  toast.setAttribute('data-message', message); // For duplicate detection
+  toast.setAttribute('data-message', message);
 
   // Add to container
   container.appendChild(toast);
 
-  // Trigger animation (force reflow)
   void toast.offsetWidth;
   toast.classList.add('toast-visible');
 
-  // Auto-dismiss
   const dismissTimer = setTimeout(() => {
     toast.classList.remove('toast-visible');
     toast.classList.add('toast-hiding');
     
-    // Remove from DOM after animation
     const removeTimer = setTimeout(() => {
       if (toast.parentNode) {
         toast.parentNode.removeChild(toast);
       }
       
-      // Delay container removal to ensure all pending animations complete
-      // This prevents race conditions when toasts are added/removed rapidly
       setTimeout(() => {
         const currentContainer = document.getElementById('toast-container');
         if (currentContainer && currentContainer.children.length === 0) {
@@ -102,7 +91,6 @@ export function showToast(
         }
       }, 50);
       
-      // Clean up timer reference
       activeTimers.delete(removeTimer);
     }, 300); // Match CSS transition duration
     

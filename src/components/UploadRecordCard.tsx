@@ -1,7 +1,6 @@
 import ThumbnailImage from './ThumbnailImage';
 import type { UploadRecord } from '../types/storage';
 
-/** Displays upload record with thumbnail, filename, timestamp, and delete button. */
 interface UploadRecordCardProps {
   record: UploadRecord;
   onDelete: (id: string) => void;
@@ -27,7 +26,6 @@ export default function UploadRecordCard({
 }: UploadRecordCardProps) {
   return (
     <div className="upload-record-card">
-      {/* Left: Thumbnail (48x48px) */}
       <div className="record-thumbnail">
         <ThumbnailImage 
           mediaItemId={record.mediaItemId}
@@ -35,7 +33,6 @@ export default function UploadRecordCard({
         />
       </div>
       
-      {/* Middle: Filename + Timestamp */}
       <div className="record-info">
         <div className="record-filename">{record.filename}</div>
         <div className="record-timestamp">
@@ -43,7 +40,6 @@ export default function UploadRecordCard({
         </div>
       </div>
       
-      {/* Right: Delete Button (Only Interactive Element) */}
       <button 
         className="delete-button"
         onClick={() => onDelete(record.id)}

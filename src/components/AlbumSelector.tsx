@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { getAlbumTitle } from '../utils/albumCache';
 import { showError } from '../utils/toast';
 
-/** Displays upload destination with real-time storage sync. Opens modal on configure click. */
 interface AlbumSelectorProps {
   onConfigureClick: () => void;
 }

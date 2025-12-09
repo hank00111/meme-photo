@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { getThumbnailDataUrl } from '../utils/thumbnailCache';
 import { reportThumbnailError } from '../utils/thumbnailErrorAggregator';
 
-/** Displays thumbnail with loading state and error fallback. Uses local caching to avoid repeated API calls. */
 interface ThumbnailImageProps {
   mediaItemId: string;
   filename: string;
@@ -59,7 +58,6 @@ export default function ThumbnailImage({
 
     fetchThumbnail();
 
-    // Cleanup: prevent state updates on unmounted component
     return () => {
       isMounted = false;
     };

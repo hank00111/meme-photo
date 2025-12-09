@@ -1,8 +1,7 @@
-/** User profile fetching and caching with 1-day TTL. API: https://developers.google.com/identity/protocols/oauth2/openid-connect */
+/** User profile with 1-day cache (OpenID Connect) */
 
 import type { UserProfile, StorageSchema } from '../types/storage';
 
-/** OpenID Connect UserInfo response. */
 interface UserInfoResponse {
   sub: string;
   name?: string;
@@ -12,13 +11,13 @@ interface UserInfoResponse {
   locale?: string;
 }
 
-/** Cache expiration: 1 day (SEC-002 security fix - reduced from 7 days) */
+/** 1-day cache expiration */
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 /** UserInfo API endpoint (OpenID Connect standard) */
 const USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v3/userinfo';
 
-/** Fetches user profile from Google UserInfo endpoint. Uses 1-day cache unless forceRefresh=true. */
+/** Fetch user profile (cached for 1 day) */
 export async function getUserProfile(
   token: string,
   forceRefresh = false
@@ -76,7 +75,6 @@ export async function getUserProfile(
   }
 }
 
-/** Retrieves cached user profile if valid (not expired). */
 async function getCachedProfile(): Promise<UserProfile | null> {
   try {
     const result = await chrome.storage.local.get('userProfile') as Pick<StorageSchema, 'userProfile'>;
@@ -98,7 +96,6 @@ async function getCachedProfile(): Promise<UserProfile | null> {
   }
 }
 
-/** Saves user profile to chrome.storage.local. */
 async function cacheProfile(profile: UserProfile): Promise<void> {
   try {
     await chrome.storage.local.set({ userProfile: profile });
@@ -107,7 +104,6 @@ async function cacheProfile(profile: UserProfile): Promise<void> {
   }
 }
 
-/** Clears cached user profile. Call on logout. */
 export async function clearUserProfile(): Promise<void> {
   try {
     await chrome.storage.local.remove('userProfile');

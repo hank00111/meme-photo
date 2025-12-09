@@ -1,36 +1,7 @@
-/**
- * Toast Notification System - Content Script Version (Phase 6.2)
- * 
- * Content script specific toast notifications with unique class prefixes
- * to avoid conflicts with host page CSS.
- * 
- * Differences from src/utils/toast.ts:
- * - All class names use 'meme-photo-' prefix
- * - Designed for injection into arbitrary web pages
- * - Matches styling from src/styles/toast-content-script.css
- * 
- * Technical Notes:
- * - Runs in isolated JavaScript world (no variable conflicts with page)
- * - Shares DOM with page (requires unique CSS class names)
- * - Injected programmatically only when needed (context menu click)
- * 
- * @example
- * ```typescript
- * import { showToast, ERROR_MESSAGES } from '../utils/toastContentScript';
- * 
- * showToast(ERROR_MESSAGES.UPLOAD_FAILED, 'error');
- * showToast('Image uploaded successfully!', 'success');
- * ```
- */
+/** Toast notifications for content script (prefixed to avoid CSS conflicts) */
 
-/**
- * Toast notification types
- */
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
-/**
- * Predefined error messages (English-first, prepared for i18n)
- */
 export const ERROR_MESSAGES = {
   THUMBNAIL_LOAD_FAILED: 'Failed to load thumbnail. Please try again.',
   NETWORK_ERROR: 'Network connection failed. Please check your internet.',
@@ -44,20 +15,8 @@ export const ERROR_MESSAGES = {
   PROFILE_LOAD_FAILED: 'Failed to load user profile. Please try again.'
 } as const;
 
-/**
- * Extended toast type including loading state
- */
 export type ExtendedToastType = ToastType | 'loading';
 
-/**
- * Show a toast notification in the content script context
- * 
- * @param message - Message to display
- * @param type - Toast type (success/error/info/warning/loading)
- * @param options - Optional configuration
- * @param options.duration - Auto-dismiss duration in ms (default: 3000, 0 = no auto-dismiss)
- * @param options.toastId - Optional ID for dismissing specific toasts
- */
 export function showToast(
   message: string, 
   type: ExtendedToastType = 'info', 
@@ -120,10 +79,6 @@ export function showToast(
   }
 }
 
-/**
- * Remove a toast element with animation
- * @internal
- */
 function removeToastElement(toast: Element, container: Element | null): void {
   toast.classList.remove('meme-photo-toast-visible');
   toast.classList.add('meme-photo-toast-hiding');
@@ -141,12 +96,6 @@ function removeToastElement(toast: Element, container: Element | null): void {
   }, 300); // Match CSS transition duration
 }
 
-/**
- * Dismiss a specific toast by its ID
- * 
- * @param toastId - The ID of the toast to dismiss
- * @returns true if toast was found and dismissed, false otherwise
- */
 export function dismissToast(toastId: string): boolean {
   const container = document.getElementById('meme-photo-toast-container');
   if (!container) {
@@ -162,13 +111,6 @@ export function dismissToast(toastId: string): boolean {
   return true;
 }
 
-/**
- * Show a loading toast with spinner (does not auto-dismiss)
- * 
- * @param message - Message to display
- * @param toastId - Unique ID for this toast (required for later dismissal)
- * @param failsafeTimeout - Maximum time before auto-dismiss in ms (default: 30000)
- */
 export function showLoading(
   message: string,
   toastId: string,
@@ -184,20 +126,10 @@ export function showLoading(
   }
 }
 
-/**
- * Show error toast with predefined message
- * 
- * @param errorKey - Key from ERROR_MESSAGES
- */
 export function showError(errorKey: keyof typeof ERROR_MESSAGES): void {
   showToast(ERROR_MESSAGES[errorKey], 'error');
 }
 
-/**
- * Show success toast
- * 
- * @param message - Success message
- */
 export function showSuccess(message: string): void {
   showToast(message, 'success');
 }

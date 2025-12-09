@@ -5,7 +5,6 @@ import { showSuccess, showError } from '../utils/toast';
 import { cleanupThumbnailErrorAggregator } from '../utils/thumbnailErrorAggregator';
 import type { UploadRecord } from '../types/storage';
 
-/** Displays recent uploads with real-time sync across popup/sidepanel. */
 export default function UploadHistory() {
   const [records, setRecords] = useState<UploadRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,8 +49,6 @@ export default function UploadHistory() {
       const success = await deleteUploadRecord(id);
       
       if (success) {
-        // UI will be updated automatically via storage.onChanged listener
-        // No need for redundant getUploadHistory() call
         showSuccess('Record deleted successfully');
       } else {
         console.warn('HISTORY: Delete failed, record not found:', id);
@@ -63,7 +60,6 @@ export default function UploadHistory() {
     }
   };
 
-  // Loading state
   if (isLoading) {
     return <div className="loading-state">Loading...</div>;
   }

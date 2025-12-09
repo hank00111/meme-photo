@@ -1,17 +1,8 @@
-/**
- * EXIF metadata manipulation for Google Photos uploads.
- * For JPEG: removes existing EXIF and inserts minimal segment with current local datetime.
- * 
- * @see https://en.wikipedia.org/wiki/JPEG#Syntax_and_structure
- * @see https://www.media.mit.edu/pia/Research/deepview/exif.html
- */
+/** EXIF metadata manipulation for JPEG uploads */
 
 const JPEG_APP1 = 0xFFE1; // EXIF marker
 const JPEG_SOS = 0xFFDA;  // Start of Scan
 
-/**
- * Strip EXIF and insert current local datetime. Non-JPEG formats returned unchanged.
- */
 export async function stripExifMetadata(blob: Blob): Promise<Blob> {
   if (blob.type === 'image/jpeg') {
     try {
@@ -23,7 +14,6 @@ export async function stripExifMetadata(blob: Blob): Promise<Blob> {
   return blob;
 }
 
-/** Replace EXIF data in JPEG with minimal EXIF containing current local time */
 async function replaceJpegExifWithCurrentTime(blob: Blob): Promise<Blob> {
   const arrayBuffer = await blob.arrayBuffer();
   const data = new Uint8Array(arrayBuffer);
@@ -94,10 +84,6 @@ async function replaceJpegExifWithCurrentTime(blob: Blob): Promise<Blob> {
   return new Blob([result], { type: 'image/jpeg' });
 }
 
-/**
- * Create minimal EXIF APP1 segment with current local datetime.
- * Structure: APP1 marker + Length + "Exif\0\0" + TIFF header + IFD0 + EXIF IFD
- */
 function createMinimalExifSegment(): Uint8Array {
   const now = new Date();
   const dateTimeStr = formatExifDateTime(now);
@@ -195,7 +181,6 @@ function createMinimalExifSegment(): Uint8Array {
   return segment;
 }
 
-/** Format Date to EXIF format: "YYYY:MM:DD HH:MM:SS" */
 function formatExifDateTime(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');

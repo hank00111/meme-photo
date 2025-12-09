@@ -2,10 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { showError } from '../utils/toast';
 import type { UserProfile } from '../types/storage';
 
-/** Maximum number of refresh retries to prevent infinite loop */
 const MAX_REFRESH_RETRIES = 2;
 
-/** Displays user avatar with dropdown menu. Shows placeholder during loading or on error. */
 interface UserAvatarProps {
   userProfile: UserProfile | null;
   onRefresh?: () => Promise<void>;
@@ -28,7 +26,6 @@ export default function UserAvatar({
     console.error('AVATAR: Photo URL failed to load');
     setImageError(true);
     
-    // Prevent infinite loop: only retry up to MAX_REFRESH_RETRIES times
     if (refreshRetryCount < MAX_REFRESH_RETRIES) {
       setRefreshRetryCount(prev => prev + 1);
       showError('PROFILE_LOAD_FAILED');
@@ -39,7 +36,6 @@ export default function UserAvatar({
   };
 
   const handleAvatarClick = () => {
-    // Prevent opening menu during loading
     if (isLoading) return;
     setIsMenuOpen(!isMenuOpen);
   };
@@ -50,7 +46,6 @@ export default function UserAvatar({
   };
 
   useEffect(() => {
-    // Reset error state and retry count when photoUrl changes successfully
     if (userProfile?.photoUrl && imageError) {
       setImageError(false);
       setRefreshRetryCount(0);
@@ -89,8 +84,6 @@ export default function UserAvatar({
     };
   }, [isMenuOpen]);
 
-  // Determine if we should show placeholder
-  // Also show placeholder when photoUrl is empty (user has no profile picture)
   const showPlaceholder = isLoading || !userProfile || imageError || !userProfile.photoUrl;
 
   return (
@@ -99,7 +92,6 @@ export default function UserAvatar({
       ref={wrapperRef} 
       onClick={handleAvatarClick}
     >
-      {/* Avatar or Placeholder */}
       {showPlaceholder ? (
         <div className="avatar-placeholder" />
       ) : (
@@ -111,7 +103,6 @@ export default function UserAvatar({
         />
       )}
 
-      {/* Dropdown Menu - only show when menu is open, not loading, and has userProfile */}
       {isMenuOpen && !isLoading && userProfile && (
         <div className="user-menu">
           <button className="user-menu-item" onClick={handleLogoutClick}>

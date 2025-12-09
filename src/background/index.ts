@@ -2,7 +2,7 @@ import { addUploadRecord } from "../utils/uploadHistory";
 import { stripExifMetadata } from "../utils/imageProcessor";
 import { getOrCreateMemePhotoAlbum } from "../utils/albumCache";
 
-// Upload queue using Promise chain pattern to prevent concurrent write errors
+// Prevent concurrent uploads
 let uploadQueue: Promise<void> = Promise.resolve();
 
 const tabsWithInjectedCSS = new Set<number>();
@@ -151,8 +151,7 @@ async function handleImageUpload(
   _pageUrl?: string,
   tab?: chrome.tabs.Tab
 ) {
-  // Keep Service Worker alive during long upload operations
-  // Service Worker can terminate after 30 seconds of inactivity
+  // Keep worker alive (30s timeout)
   const keepAliveInterval = setInterval(() => {
     chrome.runtime.getPlatformInfo();
   }, 25 * 1000);
@@ -299,19 +298,7 @@ async function handleImageUpload(
   }
 }
 
-/**
- * Validates if a hostname is an internal/private IP address that should be blocked.
- * This prevents SSRF (Server-Side Request Forgery) attacks by blocking requests to:
- * - Loopback addresses (localhost, 127.0.0.0/8, ::1)
- * - Private networks (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
- * - Link-local addresses (169.254.0.0/16, fe80::/10)
- * - Cloud metadata endpoints (169.254.169.254)
- * - Unique Local Addresses (fc00::/7)
- * - Carrier-grade NAT (100.64.0.0/10)
- *
- * @param hostname - The hostname to validate (can be domain name or IP address)
- * @returns true if the hostname is an internal/private IP address
- */
+/** Blocks internal/private IPs to prevent SSRF attacks */
 function isInternalIP(hostname: string): boolean {
   // Check for localhost string
   if (hostname.toLowerCase() === 'localhost') {
@@ -381,8 +368,12 @@ function isInternalIP(hostname: string): boolean {
   }
 
   // Unique Local Addresses: fc00::/7 (fc00:: - fdff::)
-  if (ipv6Normalized.startsWith('fc') || ipv6Normalized.startsWith('fd')) {
-    return true;
+  // IPv6 addresses must contain colons to prevent false positives
+  // for domain names starting with 'fc' or 'fd' (e.g., fcexample.com)
+  if (ipv6Normalized.includes(':')) {
+    if (ipv6Normalized.startsWith('fc') || ipv6Normalized.startsWith('fd')) {
+      return true;
+    }
   }
 
   // Not an internal IP (could be domain name or public IP)
@@ -392,16 +383,15 @@ function isInternalIP(hostname: string): boolean {
 async function downloadImage(
   imageUrl: string
 ): Promise<{ blob: Blob; filename: string }> {
-  // Validate URL protocol (only allow HTTP/HTTPS)
   try {
     const url = new URL(imageUrl);
-    if (!["http:", "https:"].includes(url.protocol)) {
+    if (url.protocol !== "https:") {
       throw new Error(
-        `Unsupported protocol: ${url.protocol}. Only HTTP/HTTPS URLs are supported.`
+        `Unsupported protocol: ${url.protocol}. Only HTTPS URLs are supported for security.`
       );
     }
 
-    // SECURITY: Block requests to internal/private IP addresses (SSRF prevention)
+    // Prevent SSRF attacks
     if (isInternalIP(url.hostname)) {
       throw new Error(
         'Access to internal/private IP addresses is not allowed for security reasons.'
@@ -523,10 +513,7 @@ function generateFilename(mimeType: string): string {
   return `meme-photo-${timestamp}.${ext}`;
 }
 
-/**
- * Custom error class for expired/invalid OAuth tokens.
- * Thrown when API returns 401 Unauthorized.
- */
+/** OAuth token expired (401) */
 class TokenExpiredError extends Error {
   expiredToken: string;
 
@@ -537,11 +524,7 @@ class TokenExpiredError extends Error {
   }
 }
 
-/**
- * Custom error class for Google Photos API quota exceeded.
- * Thrown when API returns 429 Too Many Requests.
- * Google Photos Library API quota: 10,000 requests/day.
- */
+/** Google Photos API quota exceeded (429) */
 class QuotaExceededError extends Error {
   constructor() {
     super("Daily upload limit reached. Please try again tomorrow. (Google Photos API: 10,000 requests/day)");
@@ -549,10 +532,7 @@ class QuotaExceededError extends Error {
   }
 }
 
-/**
- * Refresh OAuth token by removing cached token and requesting new one interactively.
- * Chrome Identity API will show Google authorization page if refresh token is invalid.
- */
+/** Refresh OAuth token by removing cached token and requesting new one */
 async function refreshToken(expiredToken: string): Promise<string> {
   await chrome.identity.removeCachedAuthToken({ token: expiredToken });
   const result = await chrome.identity.getAuthToken({ interactive: true });
@@ -562,11 +542,7 @@ async function refreshToken(expiredToken: string): Promise<string> {
   return result.token;
 }
 
-/**
- * Get OAuth token from Chrome Identity API.
- * Trusts Chrome's automatic token management (caching, refresh).
- * If cached token unavailable, prompts user interactively.
- */
+/** Get OAuth token from Chrome Identity API */
 async function getAuthToken(): Promise<string | null> {
   try {
     // First try non-interactive (uses cached token)

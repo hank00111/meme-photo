@@ -1,15 +1,4 @@
-/**
- * Thumbnail Cache Utility
- * 
- * Caches thumbnails as Base64 Data URLs in chrome.storage.local.
- * Google Photos baseUrl expires after 60 minutes, but cached image data persists.
- * 
- * Features:
- * - 7-day TTL expiration for cached thumbnails
- * - LRU eviction when cache exceeds MAX_CACHE_SIZE entries
- * - Uses lastAccessedAt timestamp for LRU tracking
- * - Automatic cleanup of expired entries during cache operations
- */
+/** Thumbnail cache with 7-day TTL and LRU eviction */
 
 import type { ThumbnailCache, ThumbnailCacheEntry } from '../types/storage';
 
@@ -23,10 +12,8 @@ async function getCachedThumbnail(mediaItemId: string): Promise<string | null> {
     
     const entry = cache[mediaItemId];
     if (entry?.base64DataUrl) {
-      // Check if entry has expired
       const age = Date.now() - entry.cachedAt;
       if (age > CACHE_EXPIRY_MS) {
-        // Entry expired, remove it and return null
         delete cache[mediaItemId];
         await chrome.storage.local.set({ thumbnailCache: cache });
         return null;
@@ -53,7 +40,6 @@ async function cacheThumbnail(
     const result = await chrome.storage.local.get('thumbnailCache');
     const cache = (result.thumbnailCache ?? {}) as ThumbnailCache;
     
-    // First, clean up any expired entries
     const now = Date.now();
     for (const [key, entry] of Object.entries(cache)) {
       const age = now - entry.cachedAt;
@@ -64,14 +50,12 @@ async function cacheThumbnail(
     
     const entries = Object.entries(cache);
     if (entries.length >= MAX_CACHE_SIZE) {
-      // Sort by lastAccessedAt (or cachedAt as fallback), oldest first
       entries.sort((a, b) => {
         const timeA = a[1].lastAccessedAt ?? a[1].cachedAt;
         const timeB = b[1].lastAccessedAt ?? b[1].cachedAt;
         return timeA - timeB;
       });
       
-      // Remove oldest entries to make room (evict 10% to reduce frequent evictions)
       const evictCount = Math.max(1, Math.floor(MAX_CACHE_SIZE * 0.1));
       const entriesToRemove = entries.slice(0, evictCount);
       

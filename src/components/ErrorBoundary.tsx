@@ -1,4 +1,4 @@
-/** React Error Boundary with fallback UI and retry mechanism. */
+/** Error boundary with retry */
 
 import { Component } from 'react';
 import type { ReactNode } from 'react';
@@ -45,12 +45,10 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
   render(): ReactNode {
     if (this.state.hasError) {
-      // Use custom fallback if provided
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
-      // Default fallback UI
       return (
         <div className="error-boundary">
           <div className="error-content">
