@@ -1,8 +1,8 @@
-/** Upload history management with 50-record limit. */
+/** Upload history management with 20-record limit. */
 
 import type { UploadRecord } from '../types/storage';
 
-const MAX_RECORDS = 50;
+const MAX_RECORDS = 20;
 
 export async function getUploadHistory(): Promise<UploadRecord[]> {
   try {

@@ -5,7 +5,7 @@ import { showSuccess, showError } from '../utils/toast';
 import { cleanupThumbnailErrorAggregator } from '../utils/thumbnailErrorAggregator';
 import type { UploadRecord } from '../types/storage';
 
-/** Displays 10 most recent uploads with real-time sync across popup/sidepanel. */
+/** Displays recent uploads with real-time sync across popup/sidepanel. */
 export default function UploadHistory() {
   const [records, setRecords] = useState<UploadRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,11 +72,9 @@ export default function UploadHistory() {
     return <div className="empty-state">No upload history yet</div>;
   }
 
-  const recentRecords = records.slice(0, 10);
-
   return (
     <div className="upload-history">
-      {recentRecords.map((record) => (
+      {records.map((record) => (
         <UploadRecordCard
           key={record.id}
           record={record}

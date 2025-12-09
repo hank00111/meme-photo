@@ -1,4 +1,4 @@
-/** User profile fetching and caching with 7-day TTL. API: https://developers.google.com/identity/protocols/oauth2/openid-connect */
+/** User profile fetching and caching with 1-day TTL. API: https://developers.google.com/identity/protocols/oauth2/openid-connect */
 
 import type { UserProfile, StorageSchema } from '../types/storage';
 
@@ -12,13 +12,13 @@ interface UserInfoResponse {
   locale?: string;
 }
 
-/** Cache expiration: 7 days (profile data is relatively stable) */
-const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+/** Cache expiration: 1 day (SEC-002 security fix - reduced from 7 days) */
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 /** UserInfo API endpoint (OpenID Connect standard) */
 const USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v3/userinfo';
 
-/** Fetches user profile from Google UserInfo endpoint. Uses 7-day cache unless forceRefresh=true. */
+/** Fetches user profile from Google UserInfo endpoint. Uses 1-day cache unless forceRefresh=true. */
 export async function getUserProfile(
   token: string,
   forceRefresh = false
@@ -51,7 +51,11 @@ export async function getUserProfile(
     // Only 'sub' is required by OpenID Connect Core 1.0 Section 5.3.2
     // 'name' and 'picture' are optional claims that may not be returned
     if (!data.sub) {
-      console.error('USER_PROFILE: Missing required sub field in response', data);
+      console.error('USER_PROFILE: Missing required sub field in response', {
+        receivedFields: Object.keys(data),
+        hasName: !!data.name,
+        hasPicture: !!data.picture
+      });
       return null;
     }
 

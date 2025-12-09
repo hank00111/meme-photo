@@ -164,11 +164,9 @@ export async function listAlbums(token: string): Promise<Album[]> {
 
       // Handle API errors
       if (!response.ok) {
-        const errorText = await response.text();
         console.error('ALBUM_CACHE: API request failed', {
           status: response.status,
-          statusText: response.statusText,
-          error: errorText,
+          statusText: response.statusText
         });
 
         // Throw specific errors for common cases
@@ -249,11 +247,9 @@ export async function createAlbum(
 
     // Handle API errors
     if (!response.ok) {
-      const errorText = await response.text();
       console.error('ALBUM_CACHE: Create album failed', {
         status: response.status,
-        statusText: response.statusText,
-        error: errorText,
+        statusText: response.statusText
       });
 
       // Throw specific errors

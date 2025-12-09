@@ -2,16 +2,19 @@
  * Thumbnail Cache Utility
  * 
  * Caches thumbnails as Base64 Data URLs in chrome.storage.local.
- * Google Photos baseUrl expires after 60 minutes, but cached image data is permanent.
+ * Google Photos baseUrl expires after 60 minutes, but cached image data persists.
  * 
  * Features:
+ * - 7-day TTL expiration for cached thumbnails
  * - LRU eviction when cache exceeds MAX_CACHE_SIZE entries
  * - Uses lastAccessedAt timestamp for LRU tracking
+ * - Automatic cleanup of expired entries during cache operations
  */
 
 import type { ThumbnailCache, ThumbnailCacheEntry } from '../types/storage';
 
 const MAX_CACHE_SIZE = 100;
+const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 async function getCachedThumbnail(mediaItemId: string): Promise<string | null> {
   try {
@@ -20,6 +23,15 @@ async function getCachedThumbnail(mediaItemId: string): Promise<string | null> {
     
     const entry = cache[mediaItemId];
     if (entry?.base64DataUrl) {
+      // Check if entry has expired
+      const age = Date.now() - entry.cachedAt;
+      if (age > CACHE_EXPIRY_MS) {
+        // Entry expired, remove it and return null
+        delete cache[mediaItemId];
+        await chrome.storage.local.set({ thumbnailCache: cache });
+        return null;
+      }
+      
       entry.lastAccessedAt = Date.now();
       await chrome.storage.local.set({ thumbnailCache: cache });
       
@@ -41,6 +53,15 @@ async function cacheThumbnail(
     const result = await chrome.storage.local.get('thumbnailCache');
     const cache = (result.thumbnailCache ?? {}) as ThumbnailCache;
     
+    // First, clean up any expired entries
+    const now = Date.now();
+    for (const [key, entry] of Object.entries(cache)) {
+      const age = now - entry.cachedAt;
+      if (age > CACHE_EXPIRY_MS) {
+        delete cache[key];
+      }
+    }
+    
     const entries = Object.entries(cache);
     if (entries.length >= MAX_CACHE_SIZE) {
       // Sort by lastAccessedAt (or cachedAt as fallback), oldest first
@@ -59,7 +80,6 @@ async function cacheThumbnail(
       }
     }
     
-    const now = Date.now();
     const entry: ThumbnailCacheEntry = {
       base64DataUrl,
       cachedAt: now,
@@ -97,10 +117,8 @@ async function fetchThumbnailFromApi(
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
       console.error(
-        `THUMBNAIL_CACHE: API returned ${response.status} ${response.statusText}`,
-        errorText
+        `THUMBNAIL_CACHE: API returned ${response.status} ${response.statusText}`
       );
       return null;
     }
@@ -108,7 +126,9 @@ async function fetchThumbnailFromApi(
     const mediaItem = await response.json();
 
     if (!mediaItem.baseUrl) {
-      console.error('THUMBNAIL_CACHE: Response missing baseUrl field:', mediaItem);
+      console.error('THUMBNAIL_CACHE: Response missing baseUrl field', {
+        receivedFields: Object.keys(mediaItem || {})
+      });
       return null;
     }
 
@@ -181,10 +201,8 @@ export async function getThumbnailUrl(
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
       console.error(
-        `THUMBNAIL: API returned ${response.status} ${response.statusText}`,
-        errorText
+        `THUMBNAIL: API returned ${response.status} ${response.statusText}`
       );
       return null;
     }
@@ -192,7 +210,9 @@ export async function getThumbnailUrl(
     const mediaItem = await response.json();
 
     if (!mediaItem.baseUrl) {
-      console.error('THUMBNAIL: Response missing baseUrl field:', mediaItem);
+      console.error('THUMBNAIL: Response missing baseUrl field', {
+        receivedFields: Object.keys(mediaItem || {})
+      });
       return null;
     }
 

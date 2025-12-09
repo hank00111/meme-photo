@@ -93,8 +93,12 @@ function App() {
     try {
       const result = await chrome.identity.getAuthToken({ interactive: false })
       if (result.token) {
-        const revokeResponse = await fetch(`https://oauth2.googleapis.com/revoke?token=${result.token}`, {
-          method: 'POST'
+        const revokeResponse = await fetch('https://oauth2.googleapis.com/revoke', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: `token=${encodeURIComponent(result.token)}`
         })
         if (revokeResponse.ok) {
           // Token revoked successfully

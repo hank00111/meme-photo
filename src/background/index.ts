@@ -1,5 +1,6 @@
 import { addUploadRecord } from "../utils/uploadHistory";
 import { stripExifMetadata } from "../utils/imageProcessor";
+import { getOrCreateMemePhotoAlbum } from "../utils/albumCache";
 
 // Upload queue using Promise chain pattern to prevent concurrent write errors
 let uploadQueue: Promise<void> = Promise.resolve();
@@ -173,7 +174,7 @@ async function handleImageUpload(
   }
 
   try {
-    const token = await getAuthToken();
+    let token = await getAuthToken();
     if (!token) {
       throw new Error(
         "Failed to obtain OAuth token. Please re-authorize the extension."
@@ -185,7 +186,19 @@ async function handleImageUpload(
     // Strip EXIF to ensure Google Photos uses upload time, not original photo time
     const processedBlob = await stripExifMetadata(blob);
 
-    const uploadToken = await uploadImageBytes(processedBlob, token);
+    // Upload with automatic token refresh on 401
+    let uploadToken: string;
+    try {
+      uploadToken = await uploadImageBytes(processedBlob, token);
+    } catch (error) {
+      if (error instanceof TokenExpiredError) {
+        // Token expired during upload, refresh and retry
+        token = await refreshToken(error.expiredToken);
+        uploadToken = await uploadImageBytes(processedBlob, token);
+      } else {
+        throw error;
+      }
+    }
 
     // Read selected album ID from storage (Phase 7.4)
     const storageResult = await chrome.storage.sync.get("selectedAlbumId");
@@ -195,9 +208,6 @@ async function handleImageUpload(
     // Since March 2025 API changes, only app-created albums are allowed
     if (albumId) {
       try {
-        const { getOrCreateMemePhotoAlbum } = await import(
-          "../utils/albumCache"
-        );
         const memePhotoAlbum = await getOrCreateMemePhotoAlbum(token);
 
         // If stored albumId doesn't match app-created album, migrate to it
@@ -219,12 +229,29 @@ async function handleImageUpload(
       }
     }
 
-    const mediaItem = await createMediaItem(
-      uploadToken,
-      filename,
-      token,
-      albumId || undefined
-    );
+    // Create media item with automatic token refresh on 401
+    let mediaItem: GooglePhotosMediaItem;
+    try {
+      mediaItem = await createMediaItem(
+        uploadToken,
+        filename,
+        token,
+        albumId || undefined
+      );
+    } catch (error) {
+      if (error instanceof TokenExpiredError) {
+        // Token expired during createMediaItem, refresh and retry
+        token = await refreshToken(error.expiredToken);
+        mediaItem = await createMediaItem(
+          uploadToken,
+          filename,
+          token,
+          albumId || undefined
+        );
+      } else {
+        throw error;
+      }
+    }
 
     try {
       await addUploadRecord({
@@ -272,6 +299,96 @@ async function handleImageUpload(
   }
 }
 
+/**
+ * Validates if a hostname is an internal/private IP address that should be blocked.
+ * This prevents SSRF (Server-Side Request Forgery) attacks by blocking requests to:
+ * - Loopback addresses (localhost, 127.0.0.0/8, ::1)
+ * - Private networks (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+ * - Link-local addresses (169.254.0.0/16, fe80::/10)
+ * - Cloud metadata endpoints (169.254.169.254)
+ * - Unique Local Addresses (fc00::/7)
+ * - Carrier-grade NAT (100.64.0.0/10)
+ *
+ * @param hostname - The hostname to validate (can be domain name or IP address)
+ * @returns true if the hostname is an internal/private IP address
+ */
+function isInternalIP(hostname: string): boolean {
+  // Check for localhost string
+  if (hostname.toLowerCase() === 'localhost') {
+    return true;
+  }
+
+  // IPv4 validation patterns
+  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  const ipv4Match = hostname.match(ipv4Regex);
+
+  if (ipv4Match) {
+    const octets = ipv4Match.slice(1, 5).map(Number);
+
+    // Validate octet range (0-255)
+    if (octets.some((octet) => octet > 255)) {
+      return false; // Invalid IP format
+    }
+
+    const [a, b] = octets;
+
+    // Loopback: 127.0.0.0/8
+    if (a === 127) {
+      return true;
+    }
+
+    // Private Class A: 10.0.0.0/8
+    if (a === 10) {
+      return true;
+    }
+
+    // Private Class B: 172.16.0.0/12 (172.16.0.0 - 172.31.255.255)
+    if (a === 172 && b >= 16 && b <= 31) {
+      return true;
+    }
+
+    // Private Class C: 192.168.0.0/16
+    if (a === 192 && b === 168) {
+      return true;
+    }
+
+    // Link-local: 169.254.0.0/16 (includes AWS metadata 169.254.169.254)
+    if (a === 169 && b === 254) {
+      return true;
+    }
+
+    // Carrier-grade NAT: 100.64.0.0/10 (100.64.0.0 - 100.127.255.255)
+    if (a === 100 && b >= 64 && b <= 127) {
+      return true;
+    }
+
+    // All other IPs are considered public
+    return false;
+  }
+
+  // IPv6 validation
+  // Normalize and expand IPv6 address for pattern matching
+  const ipv6Normalized = hostname.toLowerCase();
+
+  // Loopback: ::1
+  if (ipv6Normalized === '::1' || ipv6Normalized === '0:0:0:0:0:0:0:1') {
+    return true;
+  }
+
+  // Link-local: fe80::/10 (fe80:: - febf::)
+  if (ipv6Normalized.startsWith('fe80:') || ipv6Normalized.startsWith('fe80::')) {
+    return true;
+  }
+
+  // Unique Local Addresses: fc00::/7 (fc00:: - fdff::)
+  if (ipv6Normalized.startsWith('fc') || ipv6Normalized.startsWith('fd')) {
+    return true;
+  }
+
+  // Not an internal IP (could be domain name or public IP)
+  return false;
+}
+
 async function downloadImage(
   imageUrl: string
 ): Promise<{ blob: Blob; filename: string }> {
@@ -283,9 +400,16 @@ async function downloadImage(
         `Unsupported protocol: ${url.protocol}. Only HTTP/HTTPS URLs are supported.`
       );
     }
+
+    // SECURITY: Block requests to internal/private IP addresses (SSRF prevention)
+    if (isInternalIP(url.hostname)) {
+      throw new Error(
+        'Access to internal/private IP addresses is not allowed for security reasons.'
+      );
+    }
   } catch (error) {
     if (error instanceof TypeError) {
-      throw new Error(`Invalid URL: ${imageUrl}`);
+      throw new Error('Invalid URL format');
     }
     throw error;
   }
@@ -400,64 +524,69 @@ function generateFilename(mimeType: string): string {
 }
 
 /**
- * Validate OAuth token by calling tokeninfo endpoint.
- * Uses query parameter per Google OAuth2 documentation:
- * https://developers.google.com/identity/protocols/oauth2/openid-connect#validatinganidtoken
+ * Custom error class for expired/invalid OAuth tokens.
+ * Thrown when API returns 401 Unauthorized.
  */
-async function validateToken(token: string): Promise<boolean> {
-  try {
-    // Use query parameter (official standard) instead of Authorization header
-    const response = await fetch(
-      `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${encodeURIComponent(token)}`
-    );
+class TokenExpiredError extends Error {
+  expiredToken: string;
 
-    if (!response.ok) {
-      return false;
-    }
-
-    const data = await response.json();
-    // Check if token expires within 5 minutes
-    const expiresIn = parseInt(data.expires_in, 10);
-    if (isNaN(expiresIn) || expiresIn < 300) {
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error("AUTH: Token validation error:", error);
-    return false;
+  constructor(expiredToken: string) {
+    super("AUTH_TOKEN_EXPIRED");
+    this.name = "TokenExpiredError";
+    this.expiredToken = expiredToken;
   }
 }
 
-/** Get cached OAuth token (non-interactive). Returns null if unavailable. */
+/**
+ * Custom error class for Google Photos API quota exceeded.
+ * Thrown when API returns 429 Too Many Requests.
+ * Google Photos Library API quota: 10,000 requests/day.
+ */
+class QuotaExceededError extends Error {
+  constructor() {
+    super("Daily upload limit reached. Please try again tomorrow. (Google Photos API: 10,000 requests/day)");
+    this.name = "QuotaExceededError";
+  }
+}
+
+/**
+ * Refresh OAuth token by removing cached token and requesting new one interactively.
+ * Chrome Identity API will show Google authorization page if refresh token is invalid.
+ */
+async function refreshToken(expiredToken: string): Promise<string> {
+  await chrome.identity.removeCachedAuthToken({ token: expiredToken });
+  const result = await chrome.identity.getAuthToken({ interactive: true });
+  if (!result.token) {
+    throw new Error("Failed to refresh OAuth token. Please re-authorize the extension.");
+  }
+  return result.token;
+}
+
+/**
+ * Get OAuth token from Chrome Identity API.
+ * Trusts Chrome's automatic token management (caching, refresh).
+ * If cached token unavailable, prompts user interactively.
+ */
 async function getAuthToken(): Promise<string | null> {
   try {
+    // First try non-interactive (uses cached token)
     const result = await chrome.identity.getAuthToken({ interactive: false });
+    if (result.token) {
+      return result.token;
+    }
 
-    if (!result.token) {
-      console.warn("AUTH_WARNING: No cached token available");
+    // No cached token available, try interactive mode
+    // Chrome will show Google sign-in/consent page if needed
+    const interactiveResult = await chrome.identity.getAuthToken({
+      interactive: true,
+    });
+
+    if (!interactiveResult.token) {
+      console.warn("AUTH_WARNING: Interactive token request failed");
       return null;
     }
 
-    // Validate token before returning
-    const isValid = await validateToken(result.token);
-    if (!isValid) {
-      await chrome.identity.removeCachedAuthToken({ token: result.token });
-
-      // Try to get a new token interactively
-      const newResult = await chrome.identity.getAuthToken({
-        interactive: true,
-      });
-
-      if (!newResult.token) {
-        console.warn("AUTH_WARNING: Interactive token request failed");
-        return null;
-      }
-
-      return newResult.token;
-    }
-
-    return result.token;
+    return interactiveResult.token;
   } catch (error) {
     console.error("AUTH_ERROR: Failed to get auth token:", error);
     return null;
@@ -479,9 +608,18 @@ async function uploadImageBytes(blob: Blob, token: string): Promise<string> {
     }
   );
 
+  // Handle 429 Too Many Requests - quota exceeded
+  if (response.status === 429) {
+    throw new QuotaExceededError();
+  }
+
+  // Handle 401 Unauthorized - token expired or revoked
+  if (response.status === 401) {
+    throw new TokenExpiredError(token);
+  }
+
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Upload failed: ${response.status} - ${error}`);
+    throw new Error(`Upload failed with status ${response.status}`);
   }
 
   const uploadToken = await response.text();
@@ -525,9 +663,18 @@ async function createMediaItem(
     }
   );
 
+  // Handle 429 Too Many Requests - quota exceeded
+  if (response.status === 429) {
+    throw new QuotaExceededError();
+  }
+
+  // Handle 401 Unauthorized - token expired or revoked
+  if (response.status === 401) {
+    throw new TokenExpiredError(token);
+  }
+
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Failed to create media item: ${JSON.stringify(error)}`);
+    throw new Error(`Failed to create media item with status ${response.status}`);
   }
 
   const result = await response.json();
