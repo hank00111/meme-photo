@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Meme Photo",
-  "version": "0.0.22",
+  "version": "0.0.25",
   "description": "Upload images to Google Photos from context menu",
   "icons": {
     "16": "icons/icon-16.png",
