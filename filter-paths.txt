@@ -1,0 +1,5 @@
+docs/
+.github/copilot-instructions.md
+store-assets/
+spec.md
+replacements.txt

@@ -1,181 +1,92 @@
-# Meme Photo
+# Meme Photo - Google Photos Uploader
 
-> Upload images to Google Photos with a simple right-click
+Chrome Extension for uploading images to Google Photos from context menu.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome&logoColor=white)](https://chrome.google.com/webstore)
-[![React](https://img.shields.io/badge/React-19.2.0-61DAFB?logo=react&logoColor=white)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9.3-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+## 🎯 Features
 
----
+- Upload images to Google Photos with right-click context menu
+- OAuth 2.0 integration with Google account
+- Support for albums selection
+- Upload progress tracking
+- Chrome Manifest V3 compliant
 
-## Features
+## 📦 Tech Stack
 
-- **Quick Upload** - Right-click any image on the web to upload to Google Photos
-- **Album Management** - Select or create albums to organize your uploads
-- **Upload History** - Track your recent uploads with thumbnails
-- **User Profile** - Display your Google account info after authentication
-- **Modern UI** - Clean interface built with React 19 and TypeScript
-- **Manifest V3** - Built with the latest Chrome Extension standards
+- **React 19.2.0** - UI framework
+- **TypeScript 5.9.3** - Type safety
+- **Vite 7.2.2** - Build tool
+- **CRXJS Vite Plugin 2.2.1** - Chrome Extension development with HMR
+- **Chrome API Types** - Full type support for Chrome Extension APIs
 
-## Screenshots
+## 🚀 Development
 
-_Coming soon_
+### Prerequisites
 
-## Prerequisites
+- Node.js 18+ 
+- npm or pnpm
+- Google Chrome browser
 
-Before using this extension, you need:
+### Setup
 
-1. **Google Cloud Project** with OAuth 2.0 credentials
-2. **Google Photos Library API** enabled
-3. **Chrome browser** (version 88 or later)
+```bash
+# Install dependencies
+npm install
 
-## Installation
+# Start development server
+npm run dev
+```
 
-### From Source
+### Load Extension to Chrome
 
-1. **Clone this repository**
-   ```bash
-   git clone https://github.com/hank00111/meme-photo.git
-   cd meme-photo
-   ```
+1. Open `chrome://extensions/`
+2. Enable "Developer mode"
+3. Click "Load unpacked"
+4. Select the **`dist/` folder** (not project root!)
+5. Extension ID: `YOUR_EXTENSION_ID_HERE`
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+### Development Workflow
 
-3. **Configure OAuth credentials**
-   
-   Create OAuth 2.0 credentials in [Google Cloud Console](https://console.cloud.google.com/):
-   
-   - Go to **APIs & Services** > **Credentials**
-   - Click **Create Credentials** > **OAuth client ID**
-   - Select **Chrome Extension** as application type
-   - Update manifest.json with your Client ID:
-     ```json
-     "oauth2": {
-       "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
-       ...
-     }
-     ```
+- The dev server supports HMR (Hot Module Replacement)
+- Changes to source files will automatically reload the extension
+- Check Service Worker console for background script logs
 
-4. **Build the extension**
-   ```bash
-   npm run dev    # Development with HMR
-   # or
-   npm run build  # Production build
-   ```
+## 🏗️ Build
 
-5. **Load in Chrome**
-   - Open chrome://extensions/
-   - Enable **Developer mode**
-   - Click **Load unpacked**
-   - Select the dist/ folder
+```bash
+# Build for production
+npm run build
+```
 
-## OAuth Setup
+The production build will be in the `dist/` folder.
 
-To use this extension, you need to set up Google OAuth 2.0:
-
-### Step 1: Create a Google Cloud Project
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-
-### Step 2: Enable APIs
-
-1. Go to **APIs & Services** > **Library**
-2. Search and enable **Google Photos Library API**
-
-### Step 3: Configure OAuth Consent Screen
-
-1. Go to **APIs & Services** > **OAuth consent screen**
-2. Select **External** user type
-3. Fill in the required information
-4. Add these scopes:
-   - https://www.googleapis.com/auth/photoslibrary.appendonly
-   - https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata
-   - https://www.googleapis.com/auth/userinfo.profile
-
-### Step 4: Create Credentials
-
-1. Go to **APIs & Services** > **Credentials**
-2. Click **Create Credentials** > **OAuth client ID**
-3. Select **Chrome Extension**
-4. Enter your extension ID (found in chrome://extensions/)
-5. Copy the Client ID and update manifest.json
-
-## Development
-
-### Tech Stack
-
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| React | 19.2.0 | UI Framework |
-| TypeScript | 5.9.3 | Type Safety |
-| Vite | 7.2.2 | Build Tool |
-| CRXJS | 2.2.1 | Chrome Extension Plugin |
-
-### Project Structure
+## 📁 Project Structure
 
 ```
 src/
-├── background/      # Service Worker (Manifest V3)
-├── popup/           # Extension popup UI
-├── sidepanel/       # Side panel UI
-├── content/         # Content scripts
-├── components/      # Shared React components
-├── utils/           # Utility functions
-└── styles/          # Global styles
-
+├── background/      # Service Worker (background scripts)
+├── content/         # Content Scripts (page injection)
+├── popup/           # Popup UI (extension popup)
+├── options/         # Options Page (settings)
+└── utils/           # Shared utilities
 public/
-├── icons/           # Extension icons
-└── content/         # Content script assets
+└── icons/           # Extension icons
 ```
 
-### Available Scripts
+## 🔑 OAuth Setup
 
-```bash
-npm run dev      # Start dev server with HMR
-npm run build    # Production build
-npm run lint     # Run ESLint
-npm run preview  # Preview production build
-```
+See [TODO.md](./docs/2025-11-11/TODO.md) for detailed OAuth configuration steps.
 
-### Debugging
+## 📝 Documentation
 
-- **Service Worker**: Click "Service Worker" link in chrome://extensions/
-- **Popup**: Right-click extension icon > Inspect popup
-- **Side Panel**: Open side panel > Right-click > Inspect
+- [Specification](./spec.md)
+- [TODO List](./docs/2025-11-11/TODO.md)
+- [Requirement Analysis](./docs/2025-11-10/requirement-analysis.md)
+- [Tech Stack Versions](./docs/2025-11-11/tech-stack-versions.md)
 
-## Contributing
+## 🤝 Contributing
 
-Contributions are welcome! Here's how you can help:
+This is a personal project. Issues and PRs are welcome.
 
-1. **Fork** this repository
-2. **Create** a feature branch: git checkout -b feature/amazing-feature
-3. **Commit** your changes: git commit -m 'Add amazing feature'
-4. **Push** to the branch: git push origin feature/amazing-feature
-5. **Open** a Pull Request
+## 📄 License
 
-### Guidelines
-
-- Follow existing code style
-- Write clear commit messages
-- Test your changes before submitting
-- Update documentation if needed
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- [Google Photos Library API](https://developers.google.com/photos)
-- [React](https://react.dev/)
-- [Vite](https://vitejs.dev/)
-- [CRXJS](https://crxjs.dev/vite-plugin)
-
----
-
-Made with love by [hank00111](https://github.com/hank00111)
+MIT

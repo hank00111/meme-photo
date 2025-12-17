@@ -21,6 +21,7 @@ export default function UserAvatar({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [refreshRetryCount, setRefreshRetryCount] = useState(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const previousPhotoUrlRef = useRef<string | undefined>(userProfile?.photoUrl);
 
   const handleImageError = () => {
     console.error('AVATAR: Photo URL failed to load');
@@ -45,12 +46,14 @@ export default function UserAvatar({
     onLogout?.();
   };
 
-  useEffect(() => {
+  // Reset image error state when photoUrl changes (not in effect to avoid cascading renders)
+  if (userProfile?.photoUrl !== previousPhotoUrlRef.current) {
+    previousPhotoUrlRef.current = userProfile?.photoUrl;
     if (userProfile?.photoUrl && imageError) {
       setImageError(false);
       setRefreshRetryCount(0);
     }
-  }, [userProfile?.photoUrl, imageError]);
+  }
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
